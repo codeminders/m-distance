@@ -1,3 +1,6 @@
+client_secrets.json
+session.secret
+
 *.py[cod]
 
 # C extensions
@@ -15,9 +18,7 @@ var
 sdist
 develop-eggs
 .installed.cfg
-lib
 lib64
-__pycache__
 
 # Installer logs
 pip-log.txt
