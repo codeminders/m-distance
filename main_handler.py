@@ -109,7 +109,7 @@ class MainHandler(webapp2.RequestHandler):
       body['text'] = self.request.get('message')
 
     # self.mirror_service is initialized in util.auth_required.
-    self.mirror_service.timeline().insert(body=body, media_body=media).execute()
+    self.mirror_service.timeline().insert(body=body).execute()
     return  'A timeline item has been inserted.'
 
 MAIN_ROUTES = [

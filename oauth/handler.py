@@ -108,9 +108,6 @@ class OAuthCodeExchangeHandler(OAuthBaseRequestHandler):
     mirror_service = util.create_service('mirror', 'v1', creds)
     hostname = util.get_full_url(self, '')
 
-    else:
-      logging.info('Post auth tasks are not supported on staging.')
-
 
 OAUTH_ROUTES = [
     ('/auth', OAuthCodeRequestHandler),
