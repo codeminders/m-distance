@@ -14,8 +14,7 @@
 
 """OAuth 2.0 handlers."""
 
-__author__ = 'alainv@google.com (Alain Vongsouvanh)'
-
+__author__ = 'info@codeminders.com'
 
 import logging
 import webapp2
@@ -26,20 +25,20 @@ from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 
 from model import Credentials
+from model import OAuthRequestToken
 import util
 
+from rauth.service import OAuth1Service
 
-SCOPES = ('https://www.googleapis.com/auth/glass.timeline '
-          'https://www.googleapis.com/auth/glass.location '
+GOOGLE_SCOPES = ('https://www.googleapis.com/auth/glass.timeline '
           'https://www.googleapis.com/auth/userinfo.profile')
 
-
-class OAuthBaseRequestHandler(webapp2.RequestHandler):
+class GoogleOAuthBaseRequestHandler(webapp2.RequestHandler):
   """Base request handler for OAuth 2.0 flow."""
 
   def create_oauth_flow(self):
     """Create OAuth2.0 flow controller."""
-    flow = flow_from_clientsecrets('client_secrets.json', scope=SCOPES)
+    flow = flow_from_clientsecrets('client_secrets.json', scope=GOOGLE_SCOPES)
     # Dynamically set the redirect_uri based on the request URL. This is
     # extremely convenient for debugging to an alternative host without manually
     # setting the redirect URI.
@@ -48,10 +47,11 @@ class OAuthBaseRequestHandler(webapp2.RequestHandler):
     return flow
 
 
-class OAuthCodeRequestHandler(OAuthBaseRequestHandler):
+class GoogleOAuthCodeRequestHandler(GoogleOAuthBaseRequestHandler):
   """Request handler for OAuth 2.0 auth request."""
 
   def get(self):
+    logging.info('GOOGLE OAUTH FLOW START')
     flow = self.create_oauth_flow()
     flow.params['approval_prompt'] = 'force'
     # Create the redirect URI by performing step 1 of the OAuth 2.0 web server
@@ -61,7 +61,7 @@ class OAuthCodeRequestHandler(OAuthBaseRequestHandler):
     self.redirect(str(uri))
     
 
-class OAuthCodeExchangeHandler(OAuthBaseRequestHandler):
+class GoogleOAuthCodeExchangeHandler(GoogleOAuthBaseRequestHandler):
   """Request handler for OAuth 2.0 code exchange."""
 
   def get(self):
@@ -80,7 +80,8 @@ class OAuthCodeExchangeHandler(OAuthBaseRequestHandler):
       # TODO: Display error.
       return None
 
-    users_service = util.create_service('oauth2', 'v2', creds)
+    #TODO: check if it is Google response
+    users_service = util.create_google_service('oauth2', 'v2', creds)
     # TODO: Check for errors.
     user = users_service.userinfo().get().execute()
 
@@ -105,11 +106,75 @@ class OAuthCodeExchangeHandler(OAuthBaseRequestHandler):
       userid: ID of the current user.
       creds: Credentials for the current user.
     """
-    mirror_service = util.create_service('mirror', 'v1', creds)
+    mirror_service = util.create_google_service('mirror', 'v1', creds)
     hostname = util.get_full_url(self, '')
 
 
+#Fitbit Authorization endpoints
+class FitbitOAuthCodeRequestHandler(webapp2.RequestHandler):
+  """Request handler for OAuth 1 auth request."""
+
+  def get(self):
+    fitbit_oauth = util.create_fitbit_oauth_service()
+    
+    request_token, request_token_secret = fitbit_oauth.get_request_token()
+
+    #store token and secret in DB
+    userid = util.load_session_credentials(self)[0]
+
+    token_info = OAuthRequestToken(key_name=userid)
+    token_info.userid=userid
+    token_info.request_token=request_token
+    token_info.request_token_secret=request_token_secret
+    token_info.put()
+
+    authorize_url = fitbit_oauth.get_authorize_url(request_token)
+
+    # Perform the redirect.
+    self.redirect(str(authorize_url))
+    
+
+class FitbitOAuthCodeExchangeHandler(webapp2.RequestHandler):
+  """Request handler for OAuth 2.0 code exchange."""
+
+  def get(self):
+    """Handle code exchange."""
+    token_info = util.get_oauth_token(self)
+
+    if not token_info:
+      logging.error('No OAuth token found in the storage')
+      # TODO: Display error.
+      return None
+
+    oauth_verifier = self.request.get('oauth_verifier')
+    if not oauth_verifier:
+      logging.error('No OAuth verifier in the URL')
+      # TODO: Display error.
+      return None
+
+    oauth_token = self.request.get('oauth_token')
+    if not oauth_token or token_info.request_token != oauth_token:
+      logging.error('Invalid OAuth token %s %s', oauth_token, token_info.request_token)
+      # TODO: Display error.
+      return None
+
+    token_info.verifier = oauth_verifier
+    fitbit_oauth = util.create_fitbit_oauth_service()
+    access_token, access_token_secret = fitbit_oauth.get_access_token(token_info.request_token,  
+                                      token_info.request_token_secret,
+                                      data={'oauth_verifier': token_info.verifier},
+                                      header_auth=True)
+
+    token_info.access_token  = access_token
+    token_info.access_token_secret = access_token_secret
+    token_info.put()  
+
+    self.redirect('/')
+
 OAUTH_ROUTES = [
-    ('/auth', OAuthCodeRequestHandler),
-    ('/oauth2callback', OAuthCodeExchangeHandler)
+    ('/auth', GoogleOAuthCodeRequestHandler),
+    ('/oauth2callback', GoogleOAuthCodeExchangeHandler),
+    ('/fitbitauth', FitbitOAuthCodeRequestHandler),
+    ('/fitbitoauth2callback', FitbitOAuthCodeExchangeHandler)
+
 ]

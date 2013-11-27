@@ -1,4 +1,5 @@
 client_secrets.json
+fitbit_secrets.json
 session.secret
 
 *.py[cod]

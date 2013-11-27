@@ -44,7 +44,7 @@ limitations under the License.
   {% if message %}
   <div class="alert alert-info">{{ message }}</div>
   {% endif %}
-
+<!--
   <h1>Insert Message To Your Glass</h1>
 
   <form action="/" method="post">
@@ -54,6 +54,21 @@ limitations under the License.
       Insert the above message
     </button>
   </form>
+-->
+ {% if fitbit_avatar %}
+ <div>
+  <img src="{{fitbit_avatar}}"/>   {{fitbit_name}}
+ </div>
+ {% endif %}
+
+<!--
+  <form action="/" method="post">
+    <input type="hidden" name="operation" value="addFitbitDevice">
+    <button class="btn btn-block" type="submit">
+      Add your Fitbit device
+    </button>
+  </form>
+-->
 
 </div>
 

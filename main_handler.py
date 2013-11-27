@@ -37,29 +37,6 @@ import util
 jinja_environment = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)))
 
-
-class _BatchCallback(object):
-  """Class used to track batch request responses."""
-
-  def __init__(self):
-    """Initialize a new _BatchCallback object."""
-    self.success = 0
-    self.failure = 0
-
-  def callback(self, request_id, response, exception):
-    """Method called on each HTTP Response from a batch request.
-
-    For more information, see
-      https://developers.google.com/api-client-library/python/guide/batch
-    """
-    if exception is None:
-      self.success += 1
-    else:
-      self.failure += 1
-      logging.error(
-          'Failed to insert item for user %s: %s', request_id, exception)
-
-
 class MainHandler(webapp2.RequestHandler):
   """Request Handler for the main endpoint."""
 
@@ -68,12 +45,22 @@ class MainHandler(webapp2.RequestHandler):
     template_values = {'userId': self.userid}
     if message:
       template_values['message'] = message
-    # self.mirror_service is initialized in util.auth_required.
+    # self.mirror_service is initialized in util.google_auth_required.
+
+    fitbit_service = util.create_fitbit_service(self)
+    if not fitbit_service:
+      self.redirect('/fitbitauth', abort=True)
+      return
+    
+    r = fitbit_service.get('http://api.fitbit.com/1/user/-/profile.json', header_auth=True)
+    fitbit_user_profile = r.json()
+    template_values['fitbit_avatar'] = fitbit_user_profile['user']['avatar']
+    template_values['fitbit_name']   = fitbit_user_profile['user']['displayName']
 
     template = jinja_environment.get_template('templates/index.html')
     self.response.out.write(template.render(template_values))
 
-  @util.auth_required
+  @util.google_auth_required
   def get(self):
     """Render the main page."""
     # Get the flash message and delete it.
@@ -81,13 +68,14 @@ class MainHandler(webapp2.RequestHandler):
     memcache.delete(key=self.userid)
     self._render_template(message)
 
-  @util.auth_required
+  @util.google_auth_required
   def post(self):
     """Execute the request and render the template."""
     operation = self.request.get('operation')
     # Dict of operations to easily map keys to methods.
     operations = {
-        'insertItem': self._insert_item
+        'insertItem': self._insert_item,
+        'addFitbitDevice': self._add_fitbit_device
     }
     if operation in operations:
       message = operations[operation]()
@@ -96,6 +84,16 @@ class MainHandler(webapp2.RequestHandler):
     # Store the flash message for 5 seconds.
     memcache.set(key=self.userid, value=message, time=5)
     self.redirect('/')
+
+  #TODO: should we use @util.fitbit_auth_required here?
+  def _add_fitbit_device(self):
+    """Add Fitbit device (OAuth flow initiated)."""
+
+    fitbit_service = util.create_fitbit_service(self)
+    if not fitbit_service:
+      self.redirect('/fitbitauth', abort=True)
+      return  ''
+
 
   def _insert_item(self):
     """Insert a timeline item."""
@@ -108,7 +106,7 @@ class MainHandler(webapp2.RequestHandler):
     else:
       body['text'] = self.request.get('message')
 
-    # self.mirror_service is initialized in util.auth_required.
+    # self.mirror_service is initialized in util.google_auth_required.
     self.mirror_service.timeline().insert(body=body).execute()
     return  'A timeline item has been inserted.'
 

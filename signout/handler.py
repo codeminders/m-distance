@@ -31,7 +31,7 @@ OAUTH2_REVOKE_ENDPOINT = 'https://accounts.google.com/o/oauth2/revoke?token=%s'
 class SignoutHandler(webapp2.RequestHandler):
   """Request Handler for the signout endpoint."""
 
-  @util.auth_required
+  @util.google_auth_required
   def post(self):
     """Delete the user's credentials from the datastore."""
     urlfetch.fetch(OAUTH2_REVOKE_ENDPOINT % self.credentials.refresh_token)

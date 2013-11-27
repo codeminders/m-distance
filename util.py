@@ -19,6 +19,9 @@ __author__ = 'info@codeminders.com'
 
 from urlparse import urlparse
 
+from google.appengine.ext import db
+
+import logging
 import httplib2
 from apiclient.discovery import build
 from oauth2client.appengine import StorageByKeyName
@@ -26,13 +29,16 @@ from oauth2client.client import AccessTokenRefreshError
 import sessions
 
 from model import Credentials
+from model import OAuthRequestToken
 
+from rauth.service import OAuth1Service
+
+from oauth2client.anyjson import simplejson
 
 # Load the secret that is used for client side sessions
 # Create one of these for yourself with, for example:
 # python -c "import os; print os.urandom(64)" > session.secret
 SESSION_SECRET = open('session.secret').read()
-
 
 def get_full_url(request_handler, path):
   """Return the full url from the provided request handler and path."""
@@ -56,7 +62,7 @@ def store_userid(request_handler, userid):
   session.set_secure_cookie(name='userid', value=userid)
 
 
-def create_service(service, version, creds=None):
+def create_google_service(service, version, creds=None):
   """Create a Google API service.
 
   Load an API service from a discovery document and authorize it with the
@@ -79,12 +85,12 @@ def create_service(service, version, creds=None):
   return build(service, version, http=http)
 
 
-def auth_required(handler_method):
+def google_auth_required(handler_method):
   """A decorator to require that the user has authorized the Glassware."""
 
   def check_auth(self, *args):
     self.userid, self.credentials = load_session_credentials(self)
-    self.mirror_service = create_service('mirror', 'v1', self.credentials)
+    self.mirror_service = create_google_service('mirror', 'v1', self.credentials)
     # TODO: Also check that credentials are still valid.
     if self.credentials:
       try:
@@ -98,3 +104,46 @@ def auth_required(handler_method):
           credentials_entity.delete()
     self.redirect('/auth')
   return check_auth
+
+def get_oauth_token(handler):
+    userid = load_session_credentials(handler)[0]
+    return OAuthRequestToken.get(db.Key.from_path('OAuthRequestToken', userid))
+
+def create_fitbit_oauth_service():
+
+    #TODO: cache in memcache, like lib/oauth2client/clientsecrets.py
+    try:
+      fp = file('fitbit_secrets.json', 'r')
+      try:
+        json = simplejson.load(fp)
+      finally:
+        fp.close()
+    except IOError:
+      logging.error('Cannot find Fitbit service info')
+      return None
+
+    return OAuth1Service(
+      consumer_key=json['consumer_key'],
+      consumer_secret=json['consumer_secret'],
+      name='fitbit',
+      request_token_url='http://api.fitbit.com/oauth/request_token',
+      authorize_url='http://www.fitbit.com/oauth/authorize',
+      access_token_url='http://api.fitbit.com/oauth/access_token',
+      base_url='http://api.fitbit.com')
+
+def create_fitbit_service(handler):
+    fitbit_oauth_service = create_fitbit_oauth_service()
+    token_info = get_oauth_token(handler)
+    
+    if not token_info:
+      return None #No auth token in the database. need to log in to Fitbit 
+
+    #TODO: create FitbitService class
+    # session = fitbit_oauth_service.get_auth_session(token_info.oauth_token,  
+    #                                   token_info.oauth_token_secret,
+    #                                   data={'oauth_verifier': token_info.oauth_verifier},
+    #                                   header_auth=True)
+    session = fitbit_oauth_service.get_session((token_info.access_token, token_info.access_token_secret))
+    return session
+
+
