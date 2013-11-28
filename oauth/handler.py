@@ -170,18 +170,6 @@ class FitbitOAuthCodeExchangeHandler(webapp2.RequestHandler):
     token_info.access_token_secret = access_token_secret
     token_info.put()
 
-    # check if subscription exists
-    #TODO: move it to separate function
-    userid = util.load_session_credentials(self)[0]
-    fitbit_service = util.create_fitbit_service()
-    r = fitbit_service.get('http://api.fitbit.com/1/user/-/apiSubscriptions.json', header_auth=True)
-    subs = r.json()['apiSubscriptions']
-
-    #TODO: delete subscription if subs[0]['subscriptionId'] != userid:
-    # creating new fitbit subscription
-    if len(subs) == 0: 
-      r = fitbit_service.post('http://api.fitbit.com/1/user/-/apiSubscriptions/%s.json' % userid, header_auth=True)
-
     self.redirect('/')
 
 OAUTH_ROUTES = [

@@ -34,6 +34,9 @@ from oauth2client.appengine import StorageByKeyName
 from model import Credentials
 import util
 
+#TODO: move to class
+from fitbit.handler import create_subscription
+
 jinja_environment = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)))
 
@@ -59,6 +62,9 @@ class MainHandler(webapp2.RequestHandler):
 
     template = jinja_environment.get_template('templates/index.html')
     self.response.out.write(template.render(template_values))
+
+    #TODO: is this a right place?
+    create_subscription(self)
 
   @util.google_auth_required
   def get(self):
