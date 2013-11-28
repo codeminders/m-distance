@@ -12,25 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RequestHandlers for starter project."""
+"""Request Handler for /signout endpoint."""
 
 __author__ = 'info@codeminders.com'
 
 
-# Add the library location to the path
-import sys
-sys.path.insert(0, 'lib')
-
+import logging
 import webapp2
 
-from main_handler import MAIN_ROUTES
-from oauth.handler import OAUTH_ROUTES
-from signout.handler import SIGNOUT_ROUTES
-from fitbit.handler import FITBIT_ROUTES
+from google.appengine.api import urlfetch
 
-ROUTES = (
-    MAIN_ROUTES + OAUTH_ROUTES +
-    SIGNOUT_ROUTES + FITBIT_ROUTES)
+from model import Credentials
+import util
 
 
-app = webapp2.WSGIApplication(ROUTES)
+
+class FitbitSubscriptionHandler(webapp2.RequestHandler):
+  """Request Handler for the signout endpoint."""
+
+  def post(self):
+    """Delete the user's credentials from the datastore."""
+    logging.info('POST: SUBSCRIPTION UPDATE from Fitbit')
+
+  def get(self):
+    """Delete the user's credentials from the datastore."""
+    logging.info('POST: SUBSCRIPTION UPDATE from Fitbit')
+
+
+FITBIT_ROUTES = [
+    ('/fitbitsub', FitbitSubscriptionHandler)
+]

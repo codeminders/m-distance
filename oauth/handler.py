@@ -158,6 +158,7 @@ class FitbitOAuthCodeExchangeHandler(webapp2.RequestHandler):
       # TODO: Display error.
       return None
 
+    # get acceess token and store it in the database
     token_info.verifier = oauth_verifier
     fitbit_oauth = util.create_fitbit_oauth_service()
     access_token, access_token_secret = fitbit_oauth.get_access_token(token_info.request_token,  
@@ -167,7 +168,19 @@ class FitbitOAuthCodeExchangeHandler(webapp2.RequestHandler):
 
     token_info.access_token  = access_token
     token_info.access_token_secret = access_token_secret
-    token_info.put()  
+    token_info.put()
+
+    # check if subscription exists
+    #TODO: move it to separate function
+    userid = util.load_session_credentials(self)[0]
+    fitbit_service = util.create_fitbit_service()
+    r = fitbit_service.get('http://api.fitbit.com/1/user/-/apiSubscriptions.json', header_auth=True)
+    subs = r.json()['apiSubscriptions']
+
+    #TODO: delete subscription if subs[0]['subscriptionId'] != userid:
+    # creating new fitbit subscription
+    if len(subs) == 0 
+      r = fitbit_service.post('http://api.fitbit.com/1/user/-/apiSubscriptions/%s.json' % userid, header_auth=True)
 
     self.redirect('/')
 
