@@ -179,7 +179,7 @@ class FitbitOAuthCodeExchangeHandler(webapp2.RequestHandler):
 
     #TODO: delete subscription if subs[0]['subscriptionId'] != userid:
     # creating new fitbit subscription
-    if len(subs) == 0 
+    if len(subs) == 0: 
       r = fitbit_service.post('http://api.fitbit.com/1/user/-/apiSubscriptions/%s.json' % userid, header_auth=True)
 
     self.redirect('/')

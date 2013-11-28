@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Request Handler for /signout endpoint."""
+"""Request Handler for /fitbit endpoints."""
 
 __author__ = 'info@codeminders.com'
 
