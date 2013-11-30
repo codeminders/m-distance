@@ -105,9 +105,11 @@ def google_auth_required(handler_method):
     self.redirect('/auth')
   return check_auth
 
-def get_oauth_token(handler):
-    userid = load_session_credentials(handler)[0]
+def get_oauth_token_for_user(userid):
     return OAuthRequestToken.get(db.Key.from_path('OAuthRequestToken', userid))
+
+def get_oauth_token(handler):
+    return get_oauth_token_for_user(load_session_credentials(handler)[0])
 
 def create_fitbit_oauth_service():
 
@@ -131,6 +133,7 @@ def create_fitbit_oauth_service():
       access_token_url='http://api.fitbit.com/oauth/access_token',
       base_url='http://api.fitbit.com')
 
+#TODO: refactor
 def create_fitbit_service(handler):
     fitbit_oauth_service = create_fitbit_oauth_service()
     token_info = get_oauth_token(handler)
@@ -138,12 +141,16 @@ def create_fitbit_service(handler):
     if not token_info:
       return None #No auth token in the database. need to log in to Fitbit 
 
-    #TODO: create FitbitService class
-    # session = fitbit_oauth_service.get_auth_session(token_info.oauth_token,  
-    #                                   token_info.oauth_token_secret,
-    #                                   data={'oauth_verifier': token_info.oauth_verifier},
-    #                                   header_auth=True)
     session = fitbit_oauth_service.get_session((token_info.access_token, token_info.access_token_secret))
     return session
 
+def create_fitbit_service_for_user(userid):
+    fitbit_oauth_service = create_fitbit_oauth_service()
+    token_info = get_oauth_token_for_user(userid)
+    
+    if not token_info:
+      return None #No auth token in the database. need to log in to Fitbit 
+
+    session = fitbit_oauth_service.get_session((token_info.access_token, token_info.access_token_secret))
+    return session
 

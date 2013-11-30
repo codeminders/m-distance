@@ -21,9 +21,12 @@ import logging
 import webapp2
 
 from google.appengine.api import urlfetch
+from google.appengine.api import taskqueue
 
 from model import Credentials
 import util
+
+from oauth2client.anyjson import simplejson
 
 #TODO: move it somehwere
 def create_subscription(handler):
@@ -59,18 +62,39 @@ def create_subscription(handler):
 
 
 class FitbitSubscriptionHandler(webapp2.RequestHandler):
-  """Request Handler for the signout endpoint."""
+  """Request Handler for the fitbit subscription endpoint."""
 
   def post(self):
     logging.info('POST: SUBSCRIPTION UPDATE from Fitbit %s', self.request.body)
+    content = self.request.POST.get('updates').file.read()
+    logging.info('CONTENT: %s', content)
+    taskqueue.add(url='/fitbitupdate', params={'data' : content})
     self.response.set_status(204)
 
-  def get(self):
-    logging.info('GET: SUBSCRIPTION UPDATE from Fitbit')
-    self.response.set_status(204)
+class FitbitSubscriptionWorker(webapp2.RequestHandler):
+  """Request Handler for the signout endpoint."""
+
+  def post(self):
+    data = self.request.get('data')
+    logging.info('POST: SUBSCRIPTION UPDATE Worker: %s', data)
+    json = simplejson.loads(data)
+    
+    userid = json[0]['subscriptionId']
+    date = json[0]['date']
+
+    url = 'http://api.fitbit.com/1/user/-/activities/date/%s.json' % date
+    fitbit_service = util.create_fitbit_service_for_user(userid)
+    r = fitbit_service.get(url, header_auth=True)
+    if r.status_code == 200:
+      j = r.json()
+      steps = j['summary']['steps']
+      logging.info('STEPS: %s', steps)    
+    else:
+      logging.error('Cannot retrieve update from Fitbit. The code: %s', r.status_code)
 
 
 
 FITBIT_ROUTES = [
-    ('/fitbitsub', FitbitSubscriptionHandler)
+    ('/fitbitsub', FitbitSubscriptionHandler),
+    ('/fitbitupdate', FitbitSubscriptionWorker)
 ]
