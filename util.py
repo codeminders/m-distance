@@ -55,6 +55,8 @@ def load_session_credentials(request_handler):
   else:
     return None, None
 
+def credentials_by_userid(userid):
+  return StorageByKeyName(Credentials, userid, 'credentials').get()
 
 def store_userid(request_handler, userid):
   """Store current user's ID in session."""

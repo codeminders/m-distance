@@ -28,6 +28,17 @@ import util
 
 from oauth2client.anyjson import simplejson
 
+TIMECARD_TEMPLATE_HTML = """
+<article>
+  <figure>
+    <img src="https://m-distance.appspot.com/static/images/fitbit-1024-blk-transparent.png" width="240">
+  </figure>
+  <section>
+    Steps<br/><br/>%s
+  </section>
+</article>
+"""
+
 #TODO: move it somehwere
 def create_subscription(handler):
 
@@ -65,21 +76,34 @@ class FitbitSubscriptionWorker(webapp2.RequestHandler):
   def post(self):
     data = self.request.get('data')
     logging.debug('SUBSCRIPTION UPDATE Worker: %s', data)
-    json = simplejson.loads(data)
-    
-    userid = json[0]['subscriptionId']
-    date = json[0]['date']
+    updates = simplejson.loads(data)
 
-    url = 'http://api.fitbit.com/1/user/-/activities/date/%s.json' % date
-    fitbit_service = util.create_fitbit_service_for_user(userid)
-    r = fitbit_service.get(url, header_auth=True)
-    if r.status_code == 200:
-      j = r.json()
-      steps = j['summary']['steps']
-      logging.debug('STEPS: %s', steps)    
-    else:
-      logging.error('Cannot retrieve update from Fitbit. The code: %s', r.status_code)
+    for update in updates:
+      userid = update['subscriptionId']
+      date = update['date']
 
+      url = 'http://api.fitbit.com/1/user/-/activities/date/%s.json' % date
+      fitbit_service = util.create_fitbit_service_for_user(userid)
+      r = fitbit_service.get(url, header_auth=True)
+      if r.status_code == 200:
+        j = r.json()
+        steps = j['summary']['steps']
+        logging.debug('STEPS: %s', steps)    
+        _insert_to_glass(userid, steps)
+      else:
+        logging.error('Cannot retrieve update from Fitbit. The code: %s', r.status_code)
+
+
+def _insert_to_glass(userid, steps):
+  logging.debug('Creating new timeline card for user %s. Steps %s', userid, steps)
+  body = {
+    'notification': {'level': 'DEFAULT'},
+    #'text': 'Steps: %s' % steps
+    'html': TIMECARD_TEMPLATE_HTML % steps
+  }
+  credentials = util.credentials_by_userid(userid)
+  mirror_service = util.create_google_service('mirror', 'v1', credentials)
+  mirror_service.timeline().insert(body=body).execute()
 
 
 FITBIT_ROUTES = [
