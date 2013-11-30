@@ -51,11 +51,17 @@ def create_subscription(handler):
   if r.status_code == 200:
     subs = r.json()['apiSubscriptions']
 
-    if len(subs) == 0:
+    exists = False
+    for s in subs:
+      if s['subscriptionId'] == userid:
+        exists = True
+
+    if not exists:
       r = fitbit_service.post('http://api.fitbit.com/1/user/-/apiSubscriptions/%s.json' % userid, data={}, header_auth=True)
-      logging.info('Adding new subscription. The code: %s' % r.status_code)
+      logging.info('Adding new subscription for user %s. The code: %s', userid, r.status_code)
+      #TODO: retry if status code is not 201
     else:
-      logging.debug('Found subscription. Subscription id: %s Subscriber id: %s', subs[0]['subscriptionId'], subs[0]['subscriberId'])
+      logging.debug('Found subscription for user %s', userid)
   
   else:
     logging.error('Cannot get list of Fitbit subscriptions for user %s', userid)
