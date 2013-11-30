@@ -103,7 +103,7 @@ class MainHandler(webapp2.RequestHandler):
 
   def _insert_item(self):
     """Insert a timeline item."""
-    logging.info('Inserting timeline item')
+    logging.debug('Inserting timeline item')
     body = {
         'notification': {'level': 'DEFAULT'}
     }

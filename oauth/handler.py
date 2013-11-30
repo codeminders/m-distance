@@ -51,7 +51,6 @@ class GoogleOAuthCodeRequestHandler(GoogleOAuthBaseRequestHandler):
   """Request handler for OAuth 2.0 auth request."""
 
   def get(self):
-    logging.info('GOOGLE OAUTH FLOW START')
     flow = self.create_oauth_flow()
     flow.params['approval_prompt'] = 'force'
     # Create the redirect URI by performing step 1 of the OAuth 2.0 web server
