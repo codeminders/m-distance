@@ -14,7 +14,7 @@
 
 """Request Handlers for /fitbit endpoints."""
 
-__author__ = 'info@codeminders.com'
+__author__ = 'bird@codeminders.com (Alexander Sova)'
 
 
 import logging
@@ -28,6 +28,9 @@ import util
 
 from oauth2client.anyjson import simplejson
 
+from fitbit.client import FitbitAPI
+
+
 TIMECARD_TEMPLATE_HTML = """
 <article>
   <figure>
@@ -38,34 +41,6 @@ TIMECARD_TEMPLATE_HTML = """
   </section>
 </article>
 """
-
-#TODO: move it somehwere
-def create_subscription(handler):
-
-  userid = util.load_session_credentials(handler)[0]
-  logging.debug('Checking Fitbit subscription for user %s' % userid)
-
-  # check if subscription exists
-  fitbit_service = util.create_fitbit_service(handler)
-  r = fitbit_service.get('http://api.fitbit.com/1/user/-/apiSubscriptions.json', header_auth=True)
-  if r.status_code == 200:
-    subs = r.json()['apiSubscriptions']
-
-    exists = False
-    for s in subs:
-      if s['subscriptionId'] == userid:
-        exists = True
-
-    if not exists:
-      r = fitbit_service.post('http://api.fitbit.com/1/user/-/apiSubscriptions/%s.json' % userid, data={}, header_auth=True)
-      logging.info('Adding new subscription for user %s. The code: %s', userid, r.status_code)
-      #TODO: retry if status code is not 201
-    else:
-      logging.debug('Found subscription for user %s', userid)
-  
-  else:
-    logging.error('Cannot get list of Fitbit subscriptions for user %s', userid)
-
 
 class FitbitSubscriptionHandler(webapp2.RequestHandler):
   """Request Handler for the fitbit subscription endpoint."""
@@ -84,21 +59,21 @@ class FitbitSubscriptionWorker(webapp2.RequestHandler):
     logging.debug('SUBSCRIPTION UPDATE Worker: %s', data)
     updates = simplejson.loads(data)
 
+    #TODO: find most recent one!
     for update in updates:
       userid = update['subscriptionId']
+      api = FitbitAPI(userid)
+      if not api.is_ready():
+        logging.warning('No Fitbit login info for user %s', userid)
+        return
+
       date = update['date']
+      info = api.get_activities_info(date)
+      goal = info['goals']['steps']
+      steps = info['summary']['steps']
 
-      url = 'http://api.fitbit.com/1/user/-/activities/date/%s.json' % date
-      fitbit_service = util.create_fitbit_service_for_user(userid)
-      r = fitbit_service.get(url, header_auth=True)
-      if r.status_code == 200:
-        j = r.json()
-        steps = j['summary']['steps']
-        logging.debug('STEPS: %s', steps)    
-        _insert_to_glass(userid, steps)
-      else:
-        logging.error('Cannot retrieve update from Fitbit. The code: %s', r.status_code)
-
+      logging.debug('STEPS: %s GOAL %s', steps, goal)    
+      _insert_to_glass(userid, steps)
 
 def _insert_to_glass(userid, steps):
   logging.debug('Creating new timeline card for user %s. Steps %s', userid, steps)

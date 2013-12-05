@@ -114,7 +114,6 @@ def get_oauth_token(handler):
     return get_oauth_token_for_user(load_session_credentials(handler)[0])
 
 def create_fitbit_oauth_service():
-
     #TODO: cache in memcache, like lib/oauth2client/clientsecrets.py
     try:
       fp = file('fitbit_secrets.json', 'r')
@@ -137,22 +136,15 @@ def create_fitbit_oauth_service():
 
 #TODO: refactor
 def create_fitbit_service(handler):
-    fitbit_oauth_service = create_fitbit_oauth_service()
     token_info = get_oauth_token(handler)
-    
     if not token_info:
       return None #No auth token in the database. need to log in to Fitbit 
 
-    session = fitbit_oauth_service.get_session((token_info.access_token, token_info.access_token_secret))
-    return session
+    return create_fitbit_oauth_service().get_session((token_info.access_token, token_info.access_token_secret))
 
 def create_fitbit_service_for_user(userid):
-    fitbit_oauth_service = create_fitbit_oauth_service()
     token_info = get_oauth_token_for_user(userid)
-    
     if not token_info:
-      return None #No auth token in the database. need to log in to Fitbit 
+      return None # No auth token in the database. need to log in to Fitbit 
 
-    session = fitbit_oauth_service.get_session((token_info.access_token, token_info.access_token_secret))
-    return session
-
+    return create_fitbit_oauth_service().get_session((token_info.access_token, token_info.access_token_secret))

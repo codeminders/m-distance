@@ -14,7 +14,7 @@
 
 """OAuth 2.0 handlers."""
 
-__author__ = 'info@codeminders.com'
+__author__ = 'bird@codeminders.com (Alexander Sova)'
 
 import logging
 import webapp2
@@ -29,6 +29,9 @@ from model import OAuthRequestToken
 import util
 
 from rauth.service import OAuth1Service
+
+from fitbit.client import FitbitAPI
+
 
 GOOGLE_SCOPES = ('https://www.googleapis.com/auth/glass.timeline '
           'https://www.googleapis.com/auth/userinfo.profile')
@@ -122,7 +125,7 @@ class FitbitOAuthCodeRequestHandler(webapp2.RequestHandler):
     userid = util.load_session_credentials(self)[0]
 
     token_info = OAuthRequestToken(key_name=userid)
-    token_info.userid=userid
+    token_info.userid=userid #TODO: we do not need additional field here. just use the key
     token_info.request_token=request_token
     token_info.request_token_secret=request_token_secret
     token_info.put()
@@ -169,7 +172,13 @@ class FitbitOAuthCodeExchangeHandler(webapp2.RequestHandler):
     token_info.access_token_secret = access_token_secret
     token_info.put()
 
+    userid = util.load_session_credentials(self)[0]
+    self._perform_post_auth_tasks(userid, token_info)
+    #TODO: should we clean up all old subscriptions and add new one here?
     self.redirect('/')
+  
+  def _perform_post_auth_tasks(self, userid, token_info):
+    FitbitAPI(userid).create_subscription()
 
 OAUTH_ROUTES = [
     ('/auth', GoogleOAuthCodeRequestHandler),

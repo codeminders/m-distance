@@ -14,7 +14,7 @@
 
 """Request Handler for /main endpoint."""
 
-__author__ = 'info@codeminders.com'
+__author__ = 'bird@codeminders.com (Alexander Sova)'
 
 import io
 import jinja2
@@ -32,10 +32,11 @@ from apiclient.http import BatchHttpRequest
 from oauth2client.appengine import StorageByKeyName
 
 from model import Credentials
+from model import OAuthRequestToken
+
 import util
 
-#TODO: move to class
-from fitbit.handler import create_subscription
+from fitbit.client import FitbitAPI
 
 jinja_environment = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)))
@@ -48,23 +49,24 @@ class MainHandler(webapp2.RequestHandler):
     template_values = {'userId': self.userid}
     if message:
       template_values['message'] = message
-    # self.mirror_service is initialized in util.google_auth_required.
 
-    fitbit_service = util.create_fitbit_service(self)
-    if not fitbit_service:
-      self.redirect('/fitbitauth', abort=True)
-      return
-    
-    r = fitbit_service.get('http://api.fitbit.com/1/user/-/profile.json', header_auth=True)
-    fitbit_user_profile = r.json()
-    template_values['fitbit_avatar'] = fitbit_user_profile['user']['avatar']
-    template_values['fitbit_name']   = fitbit_user_profile['user']['displayName']
+    api = FitbitAPI(self.userid) 
+    if api.is_ready():
+      template_values['has_fitbit_device'] = True
+      fitbit_user_profile = api.get_user_profile()
+      template_values['fitbit_avatar'] = fitbit_user_profile['user']['avatar']
+      template_values['fitbit_name']   = fitbit_user_profile['user']['displayName']
+
+      # check if subscription is still there
+      subs = api.get_subscriptions()
+      if len(subs) == 0:
+        logging.debug('No subscription for user %s', self.userid)
+        api.create_subscription()
+      else:
+        logging.debug('Found subscription for user %s', self.userid)
 
     template = jinja_environment.get_template('templates/index.html')
     self.response.out.write(template.render(template_values))
-
-    #TODO: is this a right place?
-    create_subscription(self)
 
   @util.google_auth_required
   def get(self):
@@ -80,8 +82,8 @@ class MainHandler(webapp2.RequestHandler):
     operation = self.request.get('operation')
     # Dict of operations to easily map keys to methods.
     operations = {
-        'insertItem': self._insert_item,
-        'addFitbitDevice': self._add_fitbit_device
+        'addFitbitDevice': self._add_fitbit_device,
+        'removeFitbitDevice': self._remove_fitbit_device
     }
     if operation in operations:
       message = operations[operation]()
@@ -95,26 +97,21 @@ class MainHandler(webapp2.RequestHandler):
   def _add_fitbit_device(self):
     """Add Fitbit device (OAuth flow initiated)."""
 
-    fitbit_service = util.create_fitbit_service(self)
-    if not fitbit_service:
+    api = FitbitAPI(self.userid) 
+    if not api.is_ready():
       self.redirect('/fitbitauth', abort=True)
       return  ''
 
+  def _remove_fitbit_device(self):
+    """Delete Fitbit device."""
+    
+    api = FitbitAPI(self.userid) 
+    if api.is_ready():
+      api.delete_subscription(self.userid)
 
-  def _insert_item(self):
-    """Insert a timeline item."""
-    logging.debug('Inserting timeline item')
-    body = {
-        'notification': {'level': 'DEFAULT'}
-    }
-    if self.request.get('html') == 'on':
-      body['html'] = [self.request.get('message')]
-    else:
-      body['text'] = self.request.get('message')
-
-    # self.mirror_service is initialized in util.google_auth_required.
-    self.mirror_service.timeline().insert(body=body).execute()
-    return  'A timeline item has been inserted.'
+    token_entity = OAuthRequestToken.get_by_key_name(self.userid)
+    if token_entity:
+        token_entity.delete()
 
 MAIN_ROUTES = [
     ('/', MainHandler)
