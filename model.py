@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Datastore models for Starter Project"""
+"""Datastore models for M-Distance Project"""
 
-__author__ = 'info@codeminders.com'
+__author__ = 'bird@codeminders.com (Alexander Sova)'
 
 
 from google.appengine.ext import db
@@ -31,11 +31,22 @@ class Credentials(db.Model):
   credentials = CredentialsProperty()
 
 class OAuthRequestToken(db.Model):
-    """OAuth Request Token."""
-    userid = db.StringProperty()
-    request_token = db.StringProperty()
-    request_token_secret = db.StringProperty()
-    verifier = db.StringProperty()
-    access_token = db.StringProperty()
-    access_token_secret = db.StringProperty()
-    created = db.DateTimeProperty(auto_now_add=True)
+  """Datastore entity for storing OAuth1 Request Token for Fitbit."""
+  request_token = db.StringProperty()
+  request_token_secret = db.StringProperty()
+  verifier = db.StringProperty()
+  access_token = db.StringProperty()
+  access_token_secret = db.StringProperty()
+  created = db.DateTimeProperty(auto_now_add=True)
+
+class Preferences(db.Model):
+  """Datastore entity for storing user preferences."""
+  hourly_updates = db.BooleanProperty(default=True)
+  goal_updates = db.BooleanProperty(default=True)
+
+class FitbitStats(db.Model):
+  """Datastore entity for storing latest Fitbit activity statistics."""
+  steps = db.IntegerProperty(default=0, indexed=True)
+  goal = db.IntegerProperty(default=10000)
+  reported = db.BooleanProperty(default=False, indexed=True)
+

@@ -47,26 +47,28 @@ limitations under the License.
 
   <div class="row">
     <div class="span4">
+      
       {% if has_fitbit_device %}
-      <img src="{{fitbit_avatar}}"/> {{fitbit_name}} <br/> <br/> <br/>
+      <img src="{{fitbit_avatar}}"/> {{fitbit_name}} <br> <br> <br>
+     {% endif %}
 
       <form action="/" method="post">
-        <input type="hidden" name="operation" value="changeSettings">
-        Send hourly notifications <input type="checkbox" name="hourly_notififications"> <br> <!-- TODO: show current settings -->
-        Daily goal reached notification <input type="checkbox" name="goal_notififications"> <br> <!-- TODO: show current settings -->
+        <input type="hidden" name="operation" value="savePreferences">
+        <input type="checkbox" name="updates" value="hourly" {% if prefs_hourly_updates %}checked{% endif %}> Hourly updates <br>
+        <input type="checkbox" name="updates" value="goal" {% if prefs_goal_updates %}checked{% endif %}> Daily goal reached <br>
         <br/>
         <button class="btn btn-block" type="submit">
           Save Settings
         </button>
       </form>
 
+      {% if has_fitbit_device %}
       <form action="/" method="post">
         <input type="hidden" name="operation" value="removeFitbitDevice">
         <button class="btn btn-block" type="submit">
           Remove Fitbit device
         </button>
       </form>
-     </div>
      {% else %}
       <form action="/" method="post">
         <input type="hidden" name="operation" value="addFitbitDevice">

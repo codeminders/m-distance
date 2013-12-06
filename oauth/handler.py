@@ -125,7 +125,6 @@ class FitbitOAuthCodeRequestHandler(webapp2.RequestHandler):
     userid = util.load_session_credentials(self)[0]
 
     token_info = OAuthRequestToken(key_name=userid)
-    token_info.userid=userid #TODO: we do not need additional field here. just use the key
     token_info.request_token=request_token
     token_info.request_token_secret=request_token_secret
     token_info.put()

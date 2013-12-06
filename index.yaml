@@ -1,0 +1,6 @@
+indexes:
+
+- kind: FitbitStats
+  properties:
+  - name: reported
+  - name: steps

@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utility functions for the Quickstart."""
+"""Utility functions."""
 
-__author__ = 'info@codeminders.com'
+__author__ = 'bird@codeminders.com (Alexander Sova)'
 
 
 from urlparse import urlparse
@@ -30,6 +30,8 @@ import sessions
 
 from model import Credentials
 from model import OAuthRequestToken
+from model import Preferences
+from model import FitbitStats
 
 from rauth.service import OAuth1Service
 
@@ -108,43 +110,54 @@ def google_auth_required(handler_method):
   return check_auth
 
 def get_oauth_token_for_user(userid):
-    return OAuthRequestToken.get(db.Key.from_path('OAuthRequestToken', userid))
+  return OAuthRequestToken.get(db.Key.from_path('OAuthRequestToken', userid))
 
 def get_oauth_token(handler):
-    return get_oauth_token_for_user(load_session_credentials(handler)[0])
+  return get_oauth_token_for_user(load_session_credentials(handler)[0])
 
 def create_fitbit_oauth_service():
-    #TODO: cache in memcache, like lib/oauth2client/clientsecrets.py
+  #TODO: cache in memcache, like lib/oauth2client/clientsecrets.py
+  try:
+    fp = file('fitbit_secrets.json', 'r')
     try:
-      fp = file('fitbit_secrets.json', 'r')
-      try:
-        json = simplejson.load(fp)
-      finally:
-        fp.close()
-    except IOError:
-      logging.error('Cannot find Fitbit service info')
-      return None
+      json = simplejson.load(fp)
+    finally:
+      fp.close()
+  except IOError:
+    logging.error('Cannot find Fitbit service info')
+    return None
 
-    return OAuth1Service(
-      consumer_key=json['consumer_key'],
-      consumer_secret=json['consumer_secret'],
-      name='fitbit',
-      request_token_url='http://api.fitbit.com/oauth/request_token',
-      authorize_url='http://www.fitbit.com/oauth/authorize',
-      access_token_url='http://api.fitbit.com/oauth/access_token',
-      base_url='http://api.fitbit.com')
+  return OAuth1Service(
+    consumer_key=json['consumer_key'],
+    consumer_secret=json['consumer_secret'],
+    name='fitbit',
+    request_token_url='http://api.fitbit.com/oauth/request_token',
+    authorize_url='http://www.fitbit.com/oauth/authorize',
+    access_token_url='http://api.fitbit.com/oauth/access_token',
+    base_url='http://api.fitbit.com')
 
 #TODO: refactor
 def create_fitbit_service(handler):
-    token_info = get_oauth_token(handler)
-    if not token_info:
-      return None #No auth token in the database. need to log in to Fitbit 
+  token_info = get_oauth_token(handler)
+  if not token_info:
+    return None #No auth token in the database. need to log in to Fitbit 
 
-    return create_fitbit_oauth_service().get_session((token_info.access_token, token_info.access_token_secret))
+  return create_fitbit_oauth_service().get_session((token_info.access_token, token_info.access_token_secret))
 
 def create_fitbit_service_for_user(userid):
-    token_info = get_oauth_token_for_user(userid)
-    if not token_info:
-      return None # No auth token in the database. need to log in to Fitbit 
+  token_info = get_oauth_token_for_user(userid)
+  if not token_info:
+    return None # No auth token in the database. need to log in to Fitbit 
 
-    return create_fitbit_oauth_service().get_session((token_info.access_token, token_info.access_token_secret))
+  return create_fitbit_oauth_service().get_session((token_info.access_token, token_info.access_token_secret))
+
+def get_preferences(userid):
+  prefs = Preferences.get(db.Key.from_path('Preferences', userid))
+  if not prefs:
+    prefs = Preferences(key_name=userid)
+    prefs.put()
+
+  return prefs
+    
+def get_fitbit_stats(userid):
+  return FitbitStats.get(db.Key.from_path('FitbitStats', userid))

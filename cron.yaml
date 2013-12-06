@@ -1,0 +1,4 @@
+cron:
+- description: periodic update to glass for all users
+  url: /fitbit/notify
+  schedule: every 1 hours synchronized

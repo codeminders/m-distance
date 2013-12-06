@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RequestHandlers for starter project."""
+"""RequestHandlers for M-Distance project."""
 
-__author__ = 'info@codeminders.com'
+__author__ = 'bird@codeminders.com (Alexander Sova)'
 
 
 # Add the library location to the path

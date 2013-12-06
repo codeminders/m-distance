@@ -65,6 +65,10 @@ class MainHandler(webapp2.RequestHandler):
       else:
         logging.debug('Found subscription for user %s', self.userid)
 
+    prefs = util.get_preferences(self.userid)
+    template_values['prefs_hourly_updates'] = prefs.hourly_updates
+    template_values['prefs_goal_updates'] = prefs.goal_updates
+
     template = jinja_environment.get_template('templates/index.html')
     self.response.out.write(template.render(template_values))
 
@@ -83,7 +87,8 @@ class MainHandler(webapp2.RequestHandler):
     # Dict of operations to easily map keys to methods.
     operations = {
         'addFitbitDevice': self._add_fitbit_device,
-        'removeFitbitDevice': self._remove_fitbit_device
+        'removeFitbitDevice': self._remove_fitbit_device,
+        'savePreferences': self._save_preferences
     }
     if operation in operations:
       message = operations[operation]()
@@ -112,6 +117,15 @@ class MainHandler(webapp2.RequestHandler):
     token_entity = OAuthRequestToken.get_by_key_name(self.userid)
     if token_entity:
         token_entity.delete()
+
+  def _save_preferences(self):
+    """Save user preferences."""
+    prefs = util.get_preferences(self.userid)
+    data = self.request.get_all('updates')
+    prefs.hourly_updates = ('hourly' in data)
+    prefs.goal_updates = ('goal' in data)
+    prefs.put()
+    
 
 MAIN_ROUTES = [
     ('/', MainHandler)
