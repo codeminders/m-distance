@@ -127,10 +127,13 @@ def _insert_to_glass(userid, stats):
     'html': TIMECARD_TEMPLATE_HTML % (s, percentage)
   }
   credentials = util.credentials_by_userid(userid)
-  mirror_service = util.create_google_service('mirror', 'v1', credentials)
-  mirror_service.timeline().insert(body=body).execute()
-  stats.reported = True
-  stats.put()
+  try:
+    mirror_service = util.create_google_service('mirror', 'v1', credentials)
+    mirror_service.timeline().insert(body=body).execute()
+    stats.reported = True
+    stats.put()
+  except Exception as e:
+    logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
 
 
 FITBIT_ROUTES = [

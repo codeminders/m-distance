@@ -45,13 +45,21 @@ limitations under the License.
   <div class="alert alert-info">{{ message }}</div>
   {% endif %}
 
+<p class="lead">
+Stay up to date with your activity updates from FitBit device on your Google Glass. You will be notified when you have reached your daily goal. You can choose to receive hourly progress updates towards your goal.
+</p>
+
+<br> <br> 
   <div class="row">
     <div class="span4">
-      
+      <center>
       {% if has_fitbit_device %}
-      <img src="{{fitbit_avatar}}"/> {{fitbit_name}} <br> <br> <br>
+      <div> Welcome {{fitbit_name}}! </div> <br> 
+      <div><img src="{{fitbit_avatar}}"/> </div> <br> 
      {% endif %}
-
+      </center>
+    </div>
+    <div class="span4">
       <form action="/" method="post">
         <input type="hidden" name="operation" value="savePreferences">
         <input type="checkbox" name="updates" value="hourly" {% if prefs_hourly_updates %}checked{% endif %}> Hourly updates <br>
@@ -65,19 +73,21 @@ limitations under the License.
       {% if has_fitbit_device %}
       <form action="/" method="post">
         <input type="hidden" name="operation" value="removeFitbitDevice">
-        <button class="btn btn-block" type="submit">
+        <button class="btn btn-block btn-danger" type="submit">
           Remove Fitbit device
         </button>
       </form>
      {% else %}
       <form action="/" method="post">
         <input type="hidden" name="operation" value="addFitbitDevice">
-        <button class="btn btn-block" type="submit">
+        <button class="btn btn-block btn-primary" type="submit">
           Add Fitbit device
         </button>
       </form>
      {% endif %}
+
     </div>
+
   </div>
 
 <script
