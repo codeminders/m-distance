@@ -82,6 +82,10 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
       return
 
     info = api.get_activities_info(update['date'])
+    if not info:
+      logging.error('Cannot read update for user %s', userid)
+      return
+
     goal = int(info['goals']['steps'])
     steps = int(info['summary']['steps'])
 
@@ -99,7 +103,7 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
 
     prefs = util.get_preferences(userid)
     if steps >= goal and prefs.goal_updates:     
-      _insert_to_glass(userid, steps, goal)
+      _insert_to_glass(userid, stats)
 
 #TODO: is one Job for all users enough?
 class FitbitNotifyWorker(webapp2.RequestHandler):

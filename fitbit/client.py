@@ -45,11 +45,17 @@ class FitbitAPI:
   def get_user_profile(self):
     """Returns user profile information"""
     r = self.fitbit_service.get('http://api.fitbit.com/1/user/-/profile.json', header_auth=True)
+    logging.debug('Getting user profile. %s %s', r.status_code, r.text)
+    if r.status_code != 200:
+      return None
     return r.json()
 
   def get_activities_info(self, date):
     """Returns activities info for given date"""
     r = self.fitbit_service.get('http://api.fitbit.com/1/user/-/activities/date/%s.json' % date, header_auth=True)
+    logging.debug('Getting activities. %s %s', r.status_code, r.text)
+    if r.status_code != 200:
+      return None
     return r.json()
 
 

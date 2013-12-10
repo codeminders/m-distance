@@ -46,7 +46,7 @@ limitations under the License.
   {% endif %}
 
 <p class="lead">
-Stay up to date with your activity updates from FitBit device on your Google Glass. You will be notified when you have reached your daily goal. You can choose to receive hourly progress updates towards your goal.
+Stay up to date with your activity updates from Fitbit&reg; device on your Google Glass. You will be notified when you have reached your daily goal. You can choose to receive hourly progress updates towards your goal.
 </p>
 
 <br> <br> 
@@ -74,21 +74,27 @@ Stay up to date with your activity updates from FitBit device on your Google Gla
       <form action="/" method="post">
         <input type="hidden" name="operation" value="removeFitbitDevice">
         <button class="btn btn-block btn-danger" type="submit">
-          Unlink Fitbit device
+          Unlink Fitbit&reg; device
         </button>
       </form>
      {% else %}
       <form action="/" method="post">
         <input type="hidden" name="operation" value="addFitbitDevice">
         <button class="btn btn-block btn-primary" type="submit">
-          Add Fitbit device
+          Add Fitbit&reg; device
         </button>
       </form>
      {% endif %}
-
     </div>
 
   </div>
+
+<br>
+<p class="muted"><small>Fitbit is a registered trademark and service mark of Fitbit, Inc. <strong>M-Distance</strong> is designed for use with the Fitbit platform. This product is not put out by Fitbit, and Fitbit does not service or warrant the functionality of this product.</small></p>
+
+   <hr>
+   <footer><p>Developed by Codeminders. Please <a href="http://www.codeminders.com/contact.html">contact</a> us for Google Glass application development.</p></footer>
+</div>
 
 <script
     src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>

@@ -52,18 +52,21 @@ class MainHandler(webapp2.RequestHandler):
 
     api = FitbitAPI(self.userid) 
     if api.is_ready():
-      template_values['has_fitbit_device'] = True
       fitbit_user_profile = api.get_user_profile()
-      template_values['fitbit_avatar'] = fitbit_user_profile['user']['avatar']
-      template_values['fitbit_name']   = fitbit_user_profile['user']['displayName']
+      if fitbit_user_profile:
+        template_values['has_fitbit_device'] = True
+        template_values['fitbit_avatar'] = fitbit_user_profile['user']['avatar']
+        template_values['fitbit_name']   = fitbit_user_profile['user']['displayName']
 
-      # check if subscription is still there
-      subs = api.get_subscriptions()
-      if len(subs) == 0:
-        logging.debug('No subscription for user %s', self.userid)
-        api.create_subscription()
+        # check if subscription is still there
+        subs = api.get_subscriptions()
+        if len(subs) == 0:
+          logging.debug('No subscription for user %s', self.userid)
+          api.create_subscription()
+        else:
+          logging.debug('Found subscription for user %s', self.userid)
       else:
-        logging.debug('Found subscription for user %s', self.userid)
+        self._remove_fitbit_device()
 
     prefs = util.get_preferences(self.userid)
     template_values['prefs_hourly_updates'] = prefs.hourly_updates
@@ -110,9 +113,12 @@ class MainHandler(webapp2.RequestHandler):
   def _remove_fitbit_device(self):
     """Delete Fitbit device."""
     
-    api = FitbitAPI(self.userid) 
-    if api.is_ready():
-      api.delete_subscription(self.userid)
+    try:
+      api = FitbitAPI(self.userid) 
+      if api.is_ready():
+        api.delete_subscription(self.userid)
+    except:
+      logging.warn('Cannot delete subscription for user %s', userid)
 
     token_entity = OAuthRequestToken.get_by_key_name(self.userid)
     if token_entity:
