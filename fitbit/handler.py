@@ -17,6 +17,7 @@
 __author__ = 'bird@codeminders.com (Alexander Sova)'
 
 import locale
+import random
 
 import logging
 import webapp2
@@ -119,6 +120,23 @@ class FitbitNotifyWorker(webapp2.RequestHandler):
       if util.get_preferences(userid).hourly_updates:
         _insert_to_glass(userid, u)
 
+class FitbitSampleWorker(webapp2.RequestHandler):
+  """Handler for sample card requests.""" 
+
+  @util.google_auth_required
+  def post(self):
+    logging.debug('Sample card requested')
+    if not self.userid:
+      logging.error('No Google User Id in the session')
+      return
+
+    stats = FitbitStats()
+    stats.goal = 10000
+    stats.steps = random.randrange(100,10000)
+    _insert_to_glass(self.userid, stats)
+    self.redirect('/')    
+
+
 def _insert_to_glass(userid, stats):
   logging.debug('Creating new timeline card for user %s. Steps %s', userid, stats.steps)
 
@@ -143,5 +161,7 @@ def _insert_to_glass(userid, stats):
 FITBIT_ROUTES = [
     ('/fitbit/subscription', FitbitSubscriptionHandler),
     ('/fitbit/readupdates', FitbitUpdateWorker),
-    ('/fitbit/notify', FitbitNotifyWorker)
+    ('/fitbit/notify', FitbitNotifyWorker),
+    ('/fitbit/sample', FitbitSampleWorker)
+
 ]

@@ -70,6 +70,14 @@ Stay up to date with your activity updates from Fitbit&reg; device on your Googl
         </button>
       </form>
 
+      <div>
+        <form action="/fitbit/sample" method="post">
+          <button class="btn btn-block" type="submit">
+            Create sample timecard
+          </button>
+        </form>
+      </div>
+
       {% if has_fitbit_device %}
       <form action="/" method="post">
         <input type="hidden" name="operation" value="removeFitbitDevice">
