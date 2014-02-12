@@ -50,7 +50,7 @@ class MainHandler(webapp2.RequestHandler):
     if message:
       template_values['message'] = message
 
-    api = FitbitAPI(self.userid) 
+    api = FitbitAPI(self.userid)
     if api.is_ready():
       fitbit_user_profile = api.get_user_profile()
       if fitbit_user_profile:
@@ -105,16 +105,16 @@ class MainHandler(webapp2.RequestHandler):
   def _add_fitbit_device(self):
     """Add Fitbit device (OAuth flow initiated)."""
 
-    api = FitbitAPI(self.userid) 
+    api = FitbitAPI(self.userid)
     if not api.is_ready():
       self.redirect('/fitbitauth', abort=True)
       return  ''
 
   def _remove_fitbit_device(self):
     """Delete Fitbit device."""
-    
+
     try:
-      api = FitbitAPI(self.userid) 
+      api = FitbitAPI(self.userid)
       if api.is_ready():
         api.delete_subscription(self.userid)
     except:
@@ -131,7 +131,7 @@ class MainHandler(webapp2.RequestHandler):
     prefs.hourly_updates = ('hourly' in data)
     prefs.goal_updates = ('goal' in data)
     prefs.put()
-    
+
 
 MAIN_ROUTES = [
     ('/', MainHandler)

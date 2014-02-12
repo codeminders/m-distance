@@ -18,6 +18,7 @@ __author__ = 'bird@codeminders.com (Alexander Sova)'
 
 import locale
 import random
+import datetime
 
 import logging
 import webapp2
@@ -79,39 +80,111 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
     userid = update['subscriptionId']
     api = FitbitAPI(userid)
     if not api.is_ready():
-      logging.warning('No Fitbit login info for user %s', userid)
+      logging.error('No Fitbit login info for user %s', userid)
       return
 
-    info = api.get_activities_info(update['date'])
+    date = ''
+    try:
+      date = update['date']
+      dt = datetime.datetime.today - datetime.datetime.strptime(date, '%Y-%m-%d')
+      if dt.days > 1:
+        logging.warning('Historic update. Not interested. Skipping.')
+        return
+
+    except Exception as e:
+      logging.warning('Invalid message format (date). Skipping')
+      return
+
+    info = api.get_activities_info(date)
     if not info:
-      logging.error('Cannot read update for user %s', userid)
+      logging.error('Cannot read update for user %s for date %s', userid, date)
       return
 
-    goal = int(info['goals']['steps'])
-    steps = int(info['summary']['steps'])
+    try:
 
-    logging.debug('Got update for user %s STEPS: %s GOAL %s', userid, steps, goal)
-    stats = util.get_fitbit_stats(userid)
-    if not stats:
-      stats = FitbitStats(key_name=userid)
+      stats = util.get_fitbit_stats(userid)
+      if not stats:
+        stats = FitbitStats(key_name=userid)
 
-    if stats.steps != steps:
-      stats.reported = False
+      steps  = int(info['summary']['steps'])
+      floors = int(info['summary']['floors'])
+      distance = float(info['summary']['distances'][0]['distance']) #TODO: find 'total' in array
+      caloriesOut = int(info['summary']['caloriesOut'])
+      activeMinutes = int(info['summary']['veryActiveMinutes'])
+      if stats.steps != steps or stats.floors != floors or stats.distance != distance or stats.caloriesOut != caloriesOut or stats.activeMinutes != activeMinutes:
+        stats.reported = False
 
-    stats.goal = goal
-    stats.steps = steps
-    stats.put()
+      stats.steps = steps
+      stats.floors = floors 
+      stats.distance = distance 
+      stats.caloriesOut = caloriesOut 
+      stats.activeMinutes = activeMinutes
 
+      stats.put()
+
+      if info['goals']:
+        _store_goals(userid, info['goals'])
+
+      self.check_if_reached_goal(userid, stats)
+  
+    except Exception as e:
+      logging.error('Invaid message format (summary). Skipping')
+      return
+
+  def check_if_reached_goal(self, userid, stats):
     prefs = util.get_preferences(userid)
-    if steps >= goal and prefs.goal_updates:     
-      _insert_to_glass(userid, stats)
+    if prefs.goal_updates:
+      goals = util.get_fitbit_goals(userid)
+      if not goals:
+        goals = _fetch_goals(userid)
+        if not goals:
+          logging.warning('Sorry, cannot get goals. next time, maybe')
+          return
+    
+      if stats.steps >= goals.steps or \
+         stats.floors >= goals.floors or \
+         stats.distance >= goals.distance or \
+         stats.caloriesOut >= goals.caloriesOut or \
+         stats.activeMinutes = goals.activeMinutes:
+        _insert_to_glass(userid, stats)
 
+
+  def _store_goals(userid, info):
+    goals = util.get_fitbit_goals(userid)
+    if not goals:
+      goals = FitbitGoals(key_name=userid)
+
+    try:
+      goals.steps = int(info['goals']['steps'])
+      goals.floors = int(info['goals']['floors'])
+      goals.distance = float(info['goals']['distance'])
+      goals.caloriesOut = int(info['goals']['caloriesOut'])
+      goals.activeMinutes = int(info['goals']['activeMinutes'])
+
+      goals.put()
+
+      return goals
+    except Exception as e:
+      logging.warning('Cannot parse goals for user %s. Error: %s', userid, str(e))
+
+  #TODO: maybe to pass API object
+  def _fetch_goals(userid):
+    logging.debug('Reading daily Activity goals for user %s' % userid)
+
+    api = FitbitAPI(userid)
+    if not api.is_ready():
+      logging.error('No Fitbit login info for user %s', userid)
+      return
+
+    info = api.get_activities_goals()
+    return _store_goals(userid, info)
+  
 #TODO: is one Job for all users enough?
 class FitbitNotifyWorker(webapp2.RequestHandler):
   """Handler for Cron Job to send hourly updates to users.""" 
 
   def get(self):
-    logging.debug('Cron job triggered')
+    logging.debug('Cron job for Glass updates triggered')
     #TODO: maybe we should keep FitBit stats and prefs in one table, so we can get this list in one query
     updates = FitbitStats.gql('WHERE reported = FALSE and steps > 0') 
     for u in updates:
@@ -159,9 +232,9 @@ def _insert_to_glass(userid, stats):
 
 
 FITBIT_ROUTES = [
-    ('/fitbit/subscription', FitbitSubscriptionHandler),
-    ('/fitbit/readupdates', FitbitUpdateWorker),
-    ('/fitbit/notify', FitbitNotifyWorker),
-    ('/fitbit/sample', FitbitSampleWorker)
+    ('/fitbit/subscription', FitbitSubscriptionHandler), # FitBit -> M-Distance. Callback for FitBit to notfy if there is an update 
+    ('/fitbit/readupdates', FitbitUpdateWorker),         # M-Distance -> FitBit. Read Activity updates from Fitbit. Runs async when get notfication from FitBit
+    ('/fitbit/notify', FitbitNotifyWorker),              # M-Distance -> Glass. Hourly job to send updates to Glass
+    ('/fitbit/sample', FitbitSampleWorker)               # M-Distance -> Glass. Manually sends sample card to Glass 
 
 ]

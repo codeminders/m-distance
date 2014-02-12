@@ -58,4 +58,12 @@ class FitbitAPI:
       return None
     return r.json()
 
+  def get_activities_goals(self):
+    """Returns daily activity goals info"""
+    r = self.fitbit_service.get('http://api.fitbit.com/1/user/-/activities/goals/daily.json', header_auth=True)
+    logging.debug('Getting Daily Activity Goals. %s %s', r.status_code, r.text)
+    if r.status_code != 200:
+      return None
+    return r.json()
+
 

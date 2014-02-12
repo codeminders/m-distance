@@ -161,3 +161,7 @@ def get_preferences(userid):
     
 def get_fitbit_stats(userid):
   return FitbitStats.get(db.Key.from_path('FitbitStats', userid))
+
+def get_fitbit_goals(userid):
+  return FitbitGoals.get(db.Key.from_path('FitbitGoals', userid))
+  
