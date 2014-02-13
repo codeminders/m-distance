@@ -37,26 +37,6 @@ from fitbit.client import FitbitAPI
 
 TO_MILES = 0.6213711
 
-TIMECARD_TEMPLATE_HTML = """
-<article>
-  <figure>
-    <img src="https://m-distance.appspot.com/static/images/fitbit-1024-blk-transparent.png" width="240">
-  </figure>
-  <section>
-    <table class="text-small align-justify">       
-      <tbody>
-      <tr>
-        <td>Steps</td><td>%s</td>
-      </tr>
-      <tr>
-        <td>To Goal</td><td>%s%%</td>
-      </tr>
-      </tbody>
-    </table>
-  </section>
-</article>
-"""
-
 TIMECARD_ROW = """
     <tr>
       <td><img src="https://m-distance.appspot.com/static/images/%s.png"></td>
@@ -186,7 +166,7 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
          stats.distance >= goals.distance or \
          stats.caloriesOut >= goals.caloriesOut or \
          stats.activeMinutes >= goals.activeMinutes:
-        _insert_to_glass(userid, stats, util.get_fitbit_goals(userid))
+        _insert_to_glass(userid, stats, util.get_fitbit_goals(userid), True)
 
 #TODO: is one Job for all users enough?
 class FitbitNotifyWorker(webapp2.RequestHandler):
@@ -200,7 +180,7 @@ class FitbitNotifyWorker(webapp2.RequestHandler):
       userid = u.key().name()
       logging.debug('Found update for user %s', userid)
       if util.get_preferences(userid).hourly_updates:
-        _insert_to_glass(userid, u, util.get_fitbit_goals(userid))
+        _insert_to_glass(userid, u, util.get_fitbit_goals(userid), True)
 
 class FitbitSampleWorker(webapp2.RequestHandler):
   """Handler for sample card requests.""" 
@@ -220,7 +200,7 @@ class FitbitSampleWorker(webapp2.RequestHandler):
     stats.activeMinutes = random.randrange(0, goals.activeMinutes)
     stats.floors = random.randrange(0, goals.floors)
 
-    _insert_to_glass_new(self.userid, stats, goals, False)
+    _insert_to_glass(self.userid, stats, goals, False)
     self.redirect('/')    
 
 def _store_goals(userid, info):
@@ -255,30 +235,9 @@ def _fetch_goals(userid):
     return
 
   info = api.get_activities_goals()
-  return _store_goals(userid, info)
-  
+  return _store_goals(userid, info)  
 
-def _insert_to_glass(userid, stats, goals):
-  logging.debug('Creating new timeline card for user %s. Steps %s', userid, stats.steps)
-
-  # locale.setlocale(locale.LC_ALL, 'en_US')
-  s = locale.format("%d", stats.steps, grouping=True)
-  percentage = int(round(stats.steps*100/goals.steps)) 
-
-  body = {
-    'notification': {'level': 'DEFAULT'},
-    'html': TIMECARD_TEMPLATE_HTML % (s, percentage)
-  }
-  credentials = util.credentials_by_userid(userid)
-  try:
-    mirror_service = util.create_google_service('mirror', 'v1', credentials)
-    mirror_service.timeline().insert(body=body).execute()
-    stats.reported = True
-    stats.put()
-  except Exception as e:
-    logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
-
-def _insert_to_glass_new(userid, stats, goals, store):
+def _insert_to_glass(userid, stats, goals, store):
   logging.debug('Creating new timeline card for user %s.', userid)
 
   # locale.setlocale(locale.LC_ALL, 'en_US')
