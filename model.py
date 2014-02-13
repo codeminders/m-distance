@@ -56,7 +56,7 @@ class FitbitStats(db.Model):
   """Datastore entity for storing latest Fitbit activity statistics."""
   steps = db.IntegerProperty(default=0, indexed=True)
   floors = db.IntegerProperty(default=0)
-  distance = db.FloatProperty(default=0) #in km
+  distance = db.FloatProperty(default=0.0) #in km
   caloriesOut = db.IntegerProperty(default=0)
   activeMinutes = db.IntegerProperty(default=0)
   reported = db.BooleanProperty(default=False, indexed=True)

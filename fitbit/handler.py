@@ -29,6 +29,7 @@ from google.appengine.api import taskqueue
 from model import Credentials
 from model import Preferences
 from model import FitbitStats
+from model import FitbitGoals
 import util
 from oauth2client.anyjson import simplejson
 
@@ -86,13 +87,13 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
     date = ''
     try:
       date = update['date']
-      dt = datetime.datetime.today - datetime.datetime.strptime(date, '%Y-%m-%d')
+      dt = datetime.datetime.today() - datetime.datetime.strptime(date, '%Y-%m-%d')
       if dt.days > 1:
-        logging.warning('Historic update. Not interested. Skipping.')
+        logging.warning('Historic update. Not interested. Skipping. Date: %s', date)
         return
 
     except Exception as e:
-      logging.warning('Invalid message format (date). Skipping')
+      logging.warning('Invalid message format (date). Skipping. Error: %s', str(e))
       return
 
     info = api.get_activities_info(date)
@@ -123,12 +124,13 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
       stats.put()
 
       if info['goals']:
-        _store_goals(userid, info['goals'])
+        _store_goals(userid, info)
 
       self.check_if_reached_goal(userid, stats)
-  
+    
     except Exception as e:
-      logging.error('Invaid message format (summary). Skipping')
+      logging.error('Invalid message format (summary). Skipping. Error %s', str(e))
+      logging.exception(e)
       return
 
   def check_if_reached_goal(self, userid, stats):
@@ -146,39 +148,8 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
          stats.distance >= goals.distance or \
          stats.caloriesOut >= goals.caloriesOut or \
          stats.activeMinutes >= goals.activeMinutes:
-        _insert_to_glass(userid, stats)
+        _insert_to_glass(userid, stats, util.get_fitbit_goals(userid))
 
-
-  def _store_goals(userid, info):
-    goals = util.get_fitbit_goals(userid)
-    if not goals:
-      goals = FitbitGoals(key_name=userid)
-
-    try:
-      goals.steps = int(info['goals']['steps'])
-      goals.floors = int(info['goals']['floors'])
-      goals.distance = float(info['goals']['distance'])
-      goals.caloriesOut = int(info['goals']['caloriesOut'])
-      goals.activeMinutes = int(info['goals']['activeMinutes'])
-
-      goals.put()
-
-      return goals
-    except Exception as e:
-      logging.warning('Cannot parse goals for user %s. Error: %s', userid, str(e))
-
-  #TODO: maybe to pass API object
-  def _fetch_goals(userid):
-    logging.debug('Reading daily Activity goals for user %s' % userid)
-
-    api = FitbitAPI(userid)
-    if not api.is_ready():
-      logging.error('No Fitbit login info for user %s', userid)
-      return
-
-    info = api.get_activities_goals()
-    return _store_goals(userid, info)
-  
 #TODO: is one Job for all users enough?
 class FitbitNotifyWorker(webapp2.RequestHandler):
   """Handler for Cron Job to send hourly updates to users.""" 
@@ -210,6 +181,37 @@ class FitbitSampleWorker(webapp2.RequestHandler):
     _insert_to_glass(self.userid, stats)
     self.redirect('/')    
 
+def _store_goals(userid, info):
+  goals = util.get_fitbit_goals(userid)
+  if not goals:
+    goals = FitbitGoals(key_name=userid)
+
+  try:
+    goals.steps = int(info['goals']['steps'])
+    goals.floors = int(info['goals']['floors'])
+    goals.distance = float(info['goals']['distance'])
+    goals.caloriesOut = int(info['goals']['caloriesOut'])
+    goals.activeMinutes = int(info['goals']['activeMinutes'])
+
+    goals.put()
+
+    return goals
+  except Exception as e:
+    logging.warning('Cannot parse goals for user %s. Error: %s', userid, str(e))
+    logging.exception(e)
+
+#TODO: maybe to pass API object
+def _fetch_goals(userid):
+  logging.debug('Reading daily Activity goals for user %s' % userid)
+
+  api = FitbitAPI(userid)
+  if not api.is_ready():
+    logging.error('No Fitbit login info for user %s', userid)
+    return
+
+  info = api.get_activities_goals()
+  return _store_goals(userid, info)
+  
 
 def _insert_to_glass(userid, stats, goals):
   logging.debug('Creating new timeline card for user %s. Steps %s', userid, stats.steps)
