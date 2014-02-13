@@ -35,6 +35,8 @@ from oauth2client.anyjson import simplejson
 
 from fitbit.client import FitbitAPI
 
+TO_MILES = 0.6213711
+
 TIMECARD_TEMPLATE_HTML = """
 <article>
   <figure>
@@ -54,6 +56,37 @@ TIMECARD_TEMPLATE_HTML = """
   </section>
 </article>
 """
+
+TIMECARD_ROW = """
+    <tr>
+      <td><img src="https://m-distance.appspot.com/static/images/%s.png"></td>
+      <td style="vertical-align:middle">
+        <p>%s</p>
+        <p>%s</p>
+      </td>
+      <td style="vertical-align:middle"><img src="https://m-distance.appspot.com/static/images/progress/progress%s.png" height="110"></td>
+    </tr>
+"""
+
+TIMECARD_PAGE = """
+<article>
+  <section>
+    <table>
+    <tbody>
+%s
+
+%s
+  </section>
+%s  
+</article>
+"""
+
+TIMECARD_COVER_FOOTER = '<footer><p>Tap to see more</p></footer>'
+
+TIMECARD_FULL = "%s %s %s" % \
+(TIMECARD_PAGE % (TIMECARD_ROW % ('steps', '%s', 'Steps', '%s'), TIMECARD_ROW % ('calories', '%s', 'Burned Calories', '%s'), TIMECARD_COVER_FOOTER), \
+ TIMECARD_PAGE % (TIMECARD_ROW % ('active_minutes', '%s min', 'Very Active Mins', '%s'), TIMECARD_ROW % ('distance', '%s miles', 'Distance', '%s'), ''), \
+ TIMECARD_PAGE % (TIMECARD_ROW % ('floors', '%s', 'Floors', '%s'), '', '')) 
 
 class FitbitSubscriptionHandler(webapp2.RequestHandler):
   """Request Handler for the fitbit subscription endpoint.
@@ -108,10 +141,14 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
         stats = FitbitStats(key_name=userid)
 
       steps  = int(info['summary']['steps'])
-      floors = int(info['summary']['floors'])
-      distance = float(info['summary']['distances'][0]['distance']) #TODO: find 'total' in array
+      distance = float(info['summary']['distances'][0]['distance']) * TO_MILES #TODO: find 'total' in array
       caloriesOut = int(info['summary']['caloriesOut'])
       activeMinutes = int(info['summary']['veryActiveMinutes'])
+
+      floors = 0
+      if info['summary'].has_key('floors'):
+        floors = int(info['summary']['floors'])
+
       if stats.steps != steps or stats.floors != floors or stats.distance != distance or stats.caloriesOut != caloriesOut or stats.activeMinutes != activeMinutes:
         stats.reported = False
 
@@ -123,7 +160,7 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
 
       stats.put()
 
-      if info['goals']:
+      if info.has_key('goals'):
         _store_goals(userid, info)
 
       self.check_if_reached_goal(userid, stats)
@@ -143,8 +180,9 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
           logging.warning('Sorry, cannot get goals. next time, maybe')
           return
     
+      #TODO: show only goal reached?
       if stats.steps >= goals.steps or \
-         stats.floors >= goals.floors or \
+         (goals.floors > 0 and stats.floors >= goals.floors) or \
          stats.distance >= goals.distance or \
          stats.caloriesOut >= goals.caloriesOut or \
          stats.activeMinutes >= goals.activeMinutes:
@@ -175,10 +213,14 @@ class FitbitSampleWorker(webapp2.RequestHandler):
       return
 
     stats = FitbitStats()
-    stats.steps = random.randrange(100,10000)
-    golas = FitbitGoals()
-    goals.steps = 10000
-    _insert_to_glass(self.userid, stats)
+    goals = FitbitGoals()
+    stats.steps = random.randrange(0, goals.steps)
+    stats.distance = float(random.randrange(0, round(goals.distance))) + random.randrange(0, 100)/100 
+    stats.caloriesOut = random.randrange(0, goals.caloriesOut)
+    stats.activeMinutes = random.randrange(0, goals.activeMinutes)
+    stats.floors = random.randrange(0, goals.floors)
+
+    _insert_to_glass_new(self.userid, stats, goals, False)
     self.redirect('/')    
 
 def _store_goals(userid, info):
@@ -188,10 +230,13 @@ def _store_goals(userid, info):
 
   try:
     goals.steps = int(info['goals']['steps'])
-    goals.floors = int(info['goals']['floors'])
-    goals.distance = float(info['goals']['distance'])
+    goals.distance = float(info['goals']['distance']) * TO_MILES
     goals.caloriesOut = int(info['goals']['caloriesOut'])
     goals.activeMinutes = int(info['goals']['activeMinutes'])
+    if info['goals'].has_key('floors'):
+      goals.floors = int(info['goals']['floors'])
+    else:
+      goals.floors = 0
 
     goals.put()
 
@@ -232,6 +277,41 @@ def _insert_to_glass(userid, stats, goals):
     stats.put()
   except Exception as e:
     logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
+
+def _insert_to_glass_new(userid, stats, goals, store):
+  logging.debug('Creating new timeline card for user %s.', userid)
+
+  # locale.setlocale(locale.LC_ALL, 'en_US')
+  s = locale.format("%d", stats.steps, grouping=True)
+  percentage = int(round(stats.steps*100/goals.steps)) 
+
+  body = {
+    'notification': {'level': 'DEFAULT'},
+    'html': TIMECARD_FULL % (stats.steps, _percentage(stats.steps, goals.steps), \
+                             stats.caloriesOut, _percentage(stats.caloriesOut, goals.caloriesOut), \
+                             stats.activeMinutes, _percentage(stats.activeMinutes, goals.activeMinutes), \
+                             "%.2f" % stats.distance, _percentage(stats.distance, goals.distance), \
+                             stats.floors, _percentage(stats.floors, goals.floors)
+     )
+  }
+  credentials = util.credentials_by_userid(userid)
+  try:
+    mirror_service = util.create_google_service('mirror', 'v1', credentials)
+    mirror_service.timeline().insert(body=body).execute()
+    if store:
+      stats.reported = True
+      stats.put()
+  except Exception as e:
+    logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
+    logging.exception(e)
+
+def _percentage(value, goal):
+  if goal == 0:
+    return 0
+  p = int(round(value*100/goal)) 
+  if p > 100:
+    return 100
+  return p 
 
 
 FITBIT_ROUTES = [
