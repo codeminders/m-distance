@@ -145,7 +145,7 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
          stats.floors >= goals.floors or \
          stats.distance >= goals.distance or \
          stats.caloriesOut >= goals.caloriesOut or \
-         stats.activeMinutes = goals.activeMinutes:
+         stats.activeMinutes >= goals.activeMinutes:
         _insert_to_glass(userid, stats)
 
 
@@ -191,7 +191,7 @@ class FitbitNotifyWorker(webapp2.RequestHandler):
       userid = u.key().name()
       logging.debug('Found update for user %s', userid)
       if util.get_preferences(userid).hourly_updates:
-        _insert_to_glass(userid, u)
+        _insert_to_glass(userid, u, util.get_fitbit_goals(userid))
 
 class FitbitSampleWorker(webapp2.RequestHandler):
   """Handler for sample card requests.""" 
@@ -204,18 +204,19 @@ class FitbitSampleWorker(webapp2.RequestHandler):
       return
 
     stats = FitbitStats()
-    stats.goal = 10000
     stats.steps = random.randrange(100,10000)
+    golas = FitbitGoals()
+    goals.steps = 10000
     _insert_to_glass(self.userid, stats)
     self.redirect('/')    
 
 
-def _insert_to_glass(userid, stats):
+def _insert_to_glass(userid, stats, goals):
   logging.debug('Creating new timeline card for user %s. Steps %s', userid, stats.steps)
 
   # locale.setlocale(locale.LC_ALL, 'en_US')
   s = locale.format("%d", stats.steps, grouping=True)
-  percentage = int(round(stats.steps*100/stats.goal)) 
+  percentage = int(round(stats.steps*100/goals.steps)) 
 
   body = {
     'notification': {'level': 'DEFAULT'},
