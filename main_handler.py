@@ -50,6 +50,8 @@ class MainHandler(webapp2.RequestHandler):
     if message:
       template_values['message'] = message
 
+    logging.debug("User ID: %s" % self.userid)
+
     api = FitbitAPI(self.userid)
     if api.is_ready():
       fitbit_user_profile = api.get_user_profile()

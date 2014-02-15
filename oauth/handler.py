@@ -119,7 +119,7 @@ class FitbitOAuthCodeRequestHandler(webapp2.RequestHandler):
   def get(self):
     fitbit_oauth = util.create_fitbit_oauth_service()
     
-    request_token, request_token_secret = fitbit_oauth.get_request_token()
+    request_token, request_token_secret = fitbit_oauth.get_request_token(header_auth=True)
 
     #store token and secret in DB
     userid = util.load_session_credentials(self)[0]
