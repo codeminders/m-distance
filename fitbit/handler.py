@@ -251,7 +251,8 @@ def _insert_to_glass(userid, stats, goals, store):
                              stats.activeMinutes, _percentage(stats.activeMinutes, goals.activeMinutes), \
                              "%.2f" % stats.distance, _percentage(stats.distance, goals.distance), \
                              stats.floors, _percentage(stats.floors, goals.floors)
-     )
+     ),
+    'menuItems': [ { 'action': 'TOGGLE_PINNED' }, { 'action': 'DELETE' }]
   }
   credentials = util.credentials_by_userid(userid)
   try:
