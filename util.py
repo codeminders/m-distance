@@ -33,6 +33,7 @@ from model import OAuthRequestToken
 from model import Preferences
 from model import FitbitStats
 from model import FitbitGoals
+from model import FitbitGoalsReported
 
 from rauth.service import OAuth1Service
 
@@ -159,10 +160,13 @@ def get_preferences(userid):
     prefs.put()
 
   return prefs
-    
-def get_fitbit_stats(userid):
+
+def get_fitbit_stats(userid): 
   return FitbitStats.get(db.Key.from_path('FitbitStats', userid))
 
 def get_fitbit_goals(userid):
   return FitbitGoals.get(db.Key.from_path('FitbitGoals', userid))
+
+def get_fitbit_goals_reported(userid):
+  return FitbitGoalsReported.get(db.Key.from_path('FitbitGoalsReported', userid))
 

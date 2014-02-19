@@ -52,6 +52,14 @@ class FitbitGoals(db.Model):
   caloriesOut = db.IntegerProperty(default=2500)
   activeMinutes = db.IntegerProperty(default=30)
 
+class FitbitGoalsReported(db.Model):
+  """Datastore entity for storing daily Fitbit goals."""
+  steps = db.BooleanProperty(default=False)
+  floors = db.BooleanProperty(default=False)
+  distance = db.BooleanProperty(default=False)
+  caloriesOut = db.BooleanProperty(default=False)
+  activeMinutes = db.BooleanProperty(default=False)
+
 class FitbitStats(db.Model):
   """Datastore entity for storing latest Fitbit activity statistics."""
   steps = db.IntegerProperty(default=0, indexed=True)

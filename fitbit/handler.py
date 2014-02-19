@@ -30,6 +30,8 @@ from model import Credentials
 from model import Preferences
 from model import FitbitStats
 from model import FitbitGoals
+from model import FitbitGoalsReported
+
 import util
 from oauth2client.anyjson import simplejson
 
@@ -143,30 +145,12 @@ class FitbitUpdateWorker(webapp2.RequestHandler):
       if info.has_key('goals'):
         _store_goals(userid, info)
 
-      self.check_if_reached_goal(userid, stats)
+      _check_if_reached_goal(userid, stats)
     
     except Exception as e:
       logging.error('Invalid message format (summary). Skipping. Error %s', str(e))
       logging.exception(e)
       return
-
-  def check_if_reached_goal(self, userid, stats):
-    prefs = util.get_preferences(userid)
-    if prefs.goal_updates:
-      goals = util.get_fitbit_goals(userid)
-      if not goals:
-        goals = _fetch_goals(userid)
-        if not goals:
-          logging.warning('Sorry, cannot get goals. next time, maybe')
-          return
-    
-      #TODO: show only goal reached?
-      if stats.steps >= goals.steps or \
-         (goals.floors > 0 and stats.floors >= goals.floors) or \
-         stats.distance >= goals.distance or \
-         stats.caloriesOut >= goals.caloriesOut or \
-         stats.activeMinutes >= goals.activeMinutes:
-        _insert_to_glass(userid, stats, util.get_fitbit_goals(userid), True)
 
 #TODO: is one Job for all users enough?
 class FitbitNotifyWorker(webapp2.RequestHandler):
@@ -236,6 +220,71 @@ def _fetch_goals(userid):
 
   info = api.get_activities_goals()
   return _store_goals(userid, info)  
+
+def _check_if_reached_goal(userid, stats):
+  prefs = util.get_preferences(userid)
+  if not prefs.goal_updates:
+    return
+
+  goals = util.get_fitbit_goals(userid)
+  if not goals:
+    goals = _fetch_goals(userid)
+    if not goals:
+      logging.warning('Sorry, cannot get goals. next time, maybe. User: %s', userid)
+      return
+
+  goals_reported = util.get_fitbit_goals_reported(userid)
+  if not goals_reported:
+    goals_reported = FitbitGoalsReported(key_name=userid)
+
+  #TODO: too much duplication. need to do some Python magic here  
+  # Steps goal reached
+  if goals_reported.steps:
+    if stats.steps < goals.steps:
+      goals_reported.steps = False
+  else:    
+    if stats.steps >= goals.steps:
+      _insert_to_glass(userid, stats, goals, True)
+      goals_reported.steps = True
+    
+  # Distance goal reached
+  if goals_reported.distance:
+    if stats.distance < goals.distance:
+      goals_reported.distance = False
+  else:    
+    if stats.distance >= goals.distance:
+      _insert_to_glass(userid, stats, goals, True)
+      goals_reported.distance = True
+    
+  # CaloriesOut goal reached
+  if goals_reported.caloriesOut:
+    if stats.caloriesOut < goals.caloriesOut:
+      goals_reported.caloriesOut = False
+  else:    
+    if stats.caloriesOut >= goals.caloriesOut:
+      _insert_to_glass(userid, stats, goals, True)
+      goals_reported.caloriesOut = True
+    
+  # activeMinutes goal reached
+  if goals_reported.activeMinutes:
+    if stats.activeMinutes < goals.activeMinutes:
+      goals_reported.activeMinutes = False
+  else:    
+    if stats.activeMinutes >= goals.activeMinutes:
+      _insert_to_glass(userid, stats, goals, True)
+      goals_reported.activeMinutes = True
+    
+  # floors goal reached
+  if goals.floors > 0:
+    if goals_reported.floors:
+      if stats.floors < goals.floors:
+        goals_reported.floors = False
+    else:    
+      if stats.floors >= goals.floors:
+        _insert_to_glass(userid, stats, goals, True)
+        goals_reported.floors = True
+    
+  goals_reported.put()
 
 def _insert_to_glass(userid, stats, goals, store):
   logging.debug('Creating new timeline card for user %s.', userid)
