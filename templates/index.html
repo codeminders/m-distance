@@ -64,6 +64,7 @@ Stay up to date with your activity updates from Fitbit&reg; device on your Googl
         <input type="hidden" name="operation" value="savePreferences">
         <input type="checkbox" name="updates" value="hourly" {% if prefs_hourly_updates %}checked{% endif %}> Hourly updates <br>
         <input type="checkbox" name="updates" value="goal" {% if prefs_goal_updates %}checked{% endif %}> Daily goal reached <br>
+        <input type="checkbox" name="updates" value="battery" {% if prefs_battery_level %}checked{% endif %}> Battery level is low <br>
         <br/>
         <button class="btn btn-block" type="submit">
           Save Settings

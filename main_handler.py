@@ -73,6 +73,7 @@ class MainHandler(webapp2.RequestHandler):
     prefs = util.get_preferences(self.userid)
     template_values['prefs_hourly_updates'] = prefs.hourly_updates
     template_values['prefs_goal_updates'] = prefs.goal_updates
+    template_values['prefs_battery_level'] = prefs.battery_level
 
     template = jinja_environment.get_template('templates/index.html')
     self.response.out.write(template.render(template_values))
@@ -132,6 +133,7 @@ class MainHandler(webapp2.RequestHandler):
     data = self.request.get_all('updates')
     prefs.hourly_updates = ('hourly' in data)
     prefs.goal_updates = ('goal' in data)
+    prefs.battery_level = ('battery' in data)
     prefs.put()
 
 

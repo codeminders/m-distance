@@ -43,6 +43,7 @@ class Preferences(db.Model):
   """Datastore entity for storing user preferences."""
   hourly_updates = db.BooleanProperty(default=True)
   goal_updates = db.BooleanProperty(default=True)
+  battery_level = db.BooleanProperty(default=True)
 
 class FitbitGoals(db.Model):
   """Datastore entity for storing daily Fitbit goals."""

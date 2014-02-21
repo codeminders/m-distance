@@ -31,13 +31,42 @@ from model import Preferences
 from model import FitbitStats
 from model import FitbitGoals
 from model import FitbitGoalsReported
+from model import OAuthRequestToken
 
 import util
 from oauth2client.anyjson import simplejson
+from apiclient.errors import HttpError
 
 from fitbit.client import FitbitAPI
 
 TO_MILES = 0.6213711
+
+GOAL_TIMECARD = """
+<article>
+ <section style="margin-top:50px">
+  <center>
+  <p class="green">The daily goal reached!</p>
+  <p style="margin-top:60px">
+    <img src="https://m-distance.appspot.com/static/images/%s.png">&nbsp;<span style="vertical-align:25px" class="text-x-large">%s</span>
+  </p>
+  </center>
+</section>
+%s
+</article>
+"""
+
+BATTERY_TIMECARD = """
+<article>
+ <section style="margin-top:50px">
+  <center>
+  <p class="red"><strong>Low battery level!</strong></p><p class="text-small">Recharge your Fitbit device soon.</p>
+  <p style="margin-top:20px">
+    <img src="https://m-distance.appspot.com/static/images/battery.png">
+  </p>
+  </center>
+</section>
+</article>
+"""
 
 TIMECARD_ROW = """
     <tr>
@@ -65,7 +94,7 @@ TIMECARD_PAGE = """
 
 TIMECARD_COVER_FOOTER = '<footer><p>Tap to see more</p></footer>'
 
-TIMECARD_FULL = "%s %s %s" % \
+STATS_TIMECARD_FULL = "%s %s %s" % \
 (TIMECARD_PAGE % (TIMECARD_ROW % ('steps', '%s', 'Steps', '%s'), TIMECARD_ROW % ('calories', '%s', 'Burned Calories', '%s'), TIMECARD_COVER_FOOTER), \
  TIMECARD_PAGE % (TIMECARD_ROW % ('active_minutes', '%s min', 'Very Active Mins', '%s'), TIMECARD_ROW % ('distance', '%s miles', 'Distance', '%s'), ''), \
  TIMECARD_PAGE % (TIMECARD_ROW % ('floors', '%s', 'Floors', '%s'), '', '')) 
@@ -158,13 +187,18 @@ class FitbitNotifyWorker(webapp2.RequestHandler):
 
   def get(self):
     logging.debug('Cron job for Glass updates triggered')
-    #TODO: maybe we should keep FitBit stats and prefs in one table, so we can get this list in one query
     updates = FitbitStats.gql('WHERE reported = FALSE and steps > 0') 
     for u in updates:
       userid = u.key().name()
       logging.debug('Found update for user %s', userid)
       if util.get_preferences(userid).hourly_updates:
-        _insert_to_glass(userid, u, util.get_fitbit_goals(userid), True)
+        _insert_stats_to_glass(userid, u, util.get_fitbit_goals(userid), True)
+    
+    users = OAuthRequestToken.all() 
+    for u in users:
+      userid = u.key().name()
+      if util.get_preferences(userid).battery_level:
+        _check_battery_level(userid)
 
 class FitbitSampleWorker(webapp2.RequestHandler):
   """Handler for sample card requests.""" 
@@ -184,7 +218,10 @@ class FitbitSampleWorker(webapp2.RequestHandler):
     stats.activeMinutes = random.randrange(0, goals.activeMinutes)
     stats.floors = random.randrange(0, goals.floors)
 
-    _insert_to_glass(self.userid, stats, goals, False)
+    _insert_stats_to_glass(self.userid, stats, goals, False)
+
+    _check_battery_level(self.userid)
+
     self.redirect('/')    
 
 def _store_goals(userid, info):
@@ -237,6 +274,8 @@ def _check_if_reached_goal(userid, stats):
   if not goals_reported:
     goals_reported = FitbitGoalsReported(key_name=userid)
 
+  html = ''
+  pages = 0
   #TODO: too much duplication. need to do some Python magic here  
   # Steps goal reached
   if goals_reported.steps:
@@ -244,17 +283,10 @@ def _check_if_reached_goal(userid, stats):
       goals_reported.steps = False
   else:    
     if stats.steps >= goals.steps:
-      _insert_to_glass(userid, stats, goals, True)
+      html += (GOAL_TIMECARD % ('steps', 'Steps', '%s'))
+      pages += 1
       goals_reported.steps = True
-    
-  # Distance goal reached
-  if goals_reported.distance:
-    if stats.distance < goals.distance:
-      goals_reported.distance = False
-  else:    
-    if stats.distance >= goals.distance:
-      _insert_to_glass(userid, stats, goals, True)
-      goals_reported.distance = True
+      logging.debug('Goal for STEPS reached for user %s', userid)
     
   # CaloriesOut goal reached
   if goals_reported.caloriesOut:
@@ -262,8 +294,10 @@ def _check_if_reached_goal(userid, stats):
       goals_reported.caloriesOut = False
   else:    
     if stats.caloriesOut >= goals.caloriesOut:
-      _insert_to_glass(userid, stats, goals, True)
+      html += (GOAL_TIMECARD % ('calories', 'Burned Calories', '%s'))
+      pages += 1
       goals_reported.caloriesOut = True
+      logging.debug('Goal for CALORIES reached for user %s', userid)
     
   # activeMinutes goal reached
   if goals_reported.activeMinutes:
@@ -271,8 +305,21 @@ def _check_if_reached_goal(userid, stats):
       goals_reported.activeMinutes = False
   else:    
     if stats.activeMinutes >= goals.activeMinutes:
-      _insert_to_glass(userid, stats, goals, True)
+      html += (GOAL_TIMECARD % ('active_minutes', 'Very Active Minutes', '%s'))
+      pages += 1
       goals_reported.activeMinutes = True
+      logging.debug('Goal for ACTIVE MINUTES reached for user %s', userid)
+    
+  # Distance goal reached
+  if goals_reported.distance:
+    if stats.distance < goals.distance:
+      goals_reported.distance = False
+  else:    
+    if stats.distance >= goals.distance:
+      html += (GOAL_TIMECARD % ('distance', 'Distance', '%s'))
+      pages += 1
+      goals_reported.distance = True
+      logging.debug('Goal for DISTANCE reached for user %s', userid)
     
   # floors goal reached
   if goals.floors > 0:
@@ -281,13 +328,25 @@ def _check_if_reached_goal(userid, stats):
         goals_reported.floors = False
     else:    
       if stats.floors >= goals.floors:
-        _insert_to_glass(userid, stats, goals, True)
+        html += (GOAL_TIMECARD % ('floors', 'Floors', '%s'))
+        pages += 1
         goals_reported.floors = True
-    
+        logging.debug('Goal for FLOORS reached for user %s', userid)
+  
+  if html:
+    if pages > 1:
+      l = [TIMECARD_COVER_FOOTER]
+    else:
+      l = ['']
+
+    for i in range(pages-1):
+      l.append('')
+    _insert_info_to_glass(userid, html % tuple(l))
+
   goals_reported.put()
 
-def _insert_to_glass(userid, stats, goals, store):
-  logging.debug('Creating new timeline card for user %s.', userid)
+def _insert_stats_to_glass(userid, stats, goals, store):
+  logging.debug('Creating new stats timeline card for user %s.', userid)
 
   # locale.setlocale(locale.LC_ALL, 'en_US')
   s = locale.format("%d", stats.steps, grouping=True)
@@ -295,7 +354,7 @@ def _insert_to_glass(userid, stats, goals, store):
 
   body = {
     'notification': {'level': 'DEFAULT'},
-    'html': TIMECARD_FULL % (stats.steps, _percentage(stats.steps, goals.steps), \
+    'html': STATS_TIMECARD_FULL % (stats.steps, _percentage(stats.steps, goals.steps), \
                              stats.caloriesOut, _percentage(stats.caloriesOut, goals.caloriesOut), \
                              stats.activeMinutes, _percentage(stats.activeMinutes, goals.activeMinutes), \
                              "%.2f" % stats.distance, _percentage(stats.distance, goals.distance), \
@@ -321,6 +380,43 @@ def _percentage(value, goal):
   if p > 100:
     return 100
   return p 
+
+def _insert_info_to_glass(userid, html):
+  logging.debug('Creating new info timeline card for user %s.', userid)
+  body = {
+    'notification': {'level': 'DEFAULT'},
+    'html': html,
+    'menuItems': [ { 'action': 'DELETE' } ]
+  }
+  credentials = util.credentials_by_userid(userid)
+  try:
+    mirror_service = util.create_google_service('mirror', 'v1', credentials)
+    mirror_service.timeline().insert(body=body).execute()
+  except HttpError as he:
+    logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
+    try:
+      if he.resp.status == 401:
+        _disable_user(userid)
+    except: 
+      pass
+  except Exception as e:
+    logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
+    logging.exception(e)
+
+def _disable_user(userid):
+  logging.info("Disabling user %s", userid)
+  api = FitbitAPI(userid)
+  if api.is_ready():
+    api.clear_subscriptions()
+
+def _check_battery_level(userid):
+  api = FitbitAPI(userid)
+  if not api.is_ready():
+    return
+  devices = api.get_devices_info()
+  for d in devices:
+    if d['type'] == 'TRACKER' and d['battery'] == 'Low':
+      _insert_info_to_glass(userid, BATTERY_TIMECARD)
 
 
 FITBIT_ROUTES = [

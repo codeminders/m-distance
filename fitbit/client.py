@@ -27,14 +27,18 @@ class FitbitAPI:
   def create_subscription(self):
     """Creates new Fitbit subscription for for given user"""
 
-    # cleaning up old subscriptions
-    subs = self.get_subscriptions()
-    for s in subs:
-      self.delete_subscription(s['subscriptionId'])
+    self.clear_subscriptions()
 
     # creating new subscription
     r = self.fitbit_service.post('http://api.fitbit.com/1/user/-/apiSubscriptions/%s.json' % self.userid, data={}, header_auth=True)
     logging.info('Adding new subscription for user %s. The code: %s Message: %s', self.userid, r.status_code, r.text)
+
+  def clear_subscriptions(self):
+    """Deletes all Fitbit subscriptions for for given user"""
+
+    subs = self.get_subscriptions()
+    for s in subs:
+      self.delete_subscription(s['subscriptionId'])
 
   def delete_subscription(self, subscriptionId):
     """Deletes Fitbit subscription for for given user"""
@@ -66,4 +70,11 @@ class FitbitAPI:
       return None
     return r.json()
 
+  def get_devices_info(self):
+    """Returns devices info"""
+    r = self.fitbit_service.get('http://api.fitbit.com/1/user/-/devices.json', header_auth=True)
+    logging.debug('Getting Devices Info. %s %s', r.status_code, r.text)
+    if r.status_code != 200:
+      return None
+    return r.json()
 
