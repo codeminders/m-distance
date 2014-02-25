@@ -34,6 +34,7 @@ from model import Preferences
 from model import FitbitStats
 from model import FitbitGoals
 from model import FitbitGoalsReported
+from model import GlassTimelineItem
 
 from rauth.service import OAuth1Service
 
@@ -169,4 +170,8 @@ def get_fitbit_goals(userid):
 
 def get_fitbit_goals_reported(userid):
   return FitbitGoalsReported.get(db.Key.from_path('FitbitGoalsReported', userid))
+
+def get_timeline_item_info(userid):
+  return GlassTimelineItem.get(db.Key.from_path('GlassTimelineItem', userid))
+  
 

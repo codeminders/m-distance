@@ -32,6 +32,7 @@ from model import FitbitStats
 from model import FitbitGoals
 from model import FitbitGoalsReported
 from model import OAuthRequestToken
+from model import GlassTimelineItem
 
 import util
 from oauth2client.anyjson import simplejson
@@ -365,13 +366,34 @@ def _insert_stats_to_glass(userid, stats, goals, store):
   credentials = util.credentials_by_userid(userid)
   try:
     mirror_service = util.create_google_service('mirror', 'v1', credentials)
-    mirror_service.timeline().insert(body=body).execute()
+
+    item_info = util.get_timeline_item_info(userid)
+    if item_info and item_info.item_id:
+      try:
+        item = mirror_service.timeline().get(id=item_info.item_id).execute()
+        if item.get('isDeleted') or not item.get('isPinned'):
+          item_info.item_id = ''
+      except:
+        logging.warning('Cannot get retrieve last inserted timeline item for user %s', userid)
+        item_info.item_id = ''
+    else:
+      item_info = GlassTimelineItem(key_name=userid)
+    
+    if item_info.item_id:
+      mirror_service.timeline().patch(id=item_info.item_id, body=body).execute()
+    else:
+      item = mirror_service.timeline().insert(body=body).execute()
+      item_info.item_id = item.get('id')
+    
+    item_info.put()
+
     if store:
       stats.reported = True
       stats.put()
   except Exception as e:
     logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
     logging.exception(e)
+
 
 def _percentage(value, goal):
   if goal == 0:

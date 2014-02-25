@@ -71,3 +71,6 @@ class FitbitStats(db.Model):
   reported = db.BooleanProperty(default=False, indexed=True)
   last_modifieed = db.DateTimeProperty(auto_now=True)
 
+class GlassTimelineItem(db.Model):
+  """Datastore entity for info about last card inserted to Glass."""
+  item_id = db.StringProperty()
