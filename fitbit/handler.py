@@ -436,6 +436,9 @@ def _check_battery_level(userid):
   if not api.is_ready():
     return
   devices = api.get_devices_info()
+  if not devices:
+    logging.warning('Cannot get devices for user %s', userid)
+    return
   for d in devices:
     if d['type'] == 'TRACKER' and d['battery'] == 'Low':
       _insert_info_to_glass(userid, BATTERY_TIMECARD)
