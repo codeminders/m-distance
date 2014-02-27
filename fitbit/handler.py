@@ -415,7 +415,7 @@ def _insert_info_to_glass(userid, html):
     mirror_service = util.create_google_service('mirror', 'v1', credentials)
     mirror_service.timeline().insert(body=body).execute()
   except HttpError as he:
-    logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(e))
+    logging.warning('Cannot insert timecard for user %s. Error: %s', userid, str(he))
     try:
       if he.resp.status == 401:
         _disable_user(userid)
